@@ -1,0 +1,5 @@
+{
+  "proprietaire": "",
+  "filNoteASoiMeme": "",
+  "commentaire": "A completer avant le premier lancement. proprietaire : votre prenom, utilise dans les prompts (dictee, agent hebdomadaire). filNoteASoiMeme : l'identifiant Beeper du fil de conversation qui vous sert de note a soi-meme ; pour le trouver, lancez Beeper Desktop, definissez la variable d'environnement BEEPER_TOKEN, puis executez `npm run trouver-fil-notes` (voir outils/trouver-fil-notes.js) et copiez ici l'identifiant affiche."
+}

@@ -1,0 +1,11 @@
+node_modules/
+.env
+*.local.json
+beeper-token*
+.superpowers/
+data/history/run.log*
+
+# Donnees reelles de l'utilisateur (tache 16) : chaque installation obtient les
+# siennes, jamais celles versionnees ici. Voir data.exemple/ pour le format et
+# des exemples, et le README pour la configuration de premier lancement.
+data/

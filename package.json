@@ -1,0 +1,14 @@
+{
+  "name": "secretaire",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --test",
+    "start": "node server/server.js",
+    "trouver-fil-notes": "node outils/trouver-fil-notes.js"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  }
+}
