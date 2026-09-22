@@ -192,10 +192,25 @@ Toutes ecrivent dans les memes fichiers de `data/projects/` et `data/people.md`.
    sans accent, espaces en traits d'union) et reste modifiable avant validation ; en
    modification il est fixe, et un bouton separe permet de supprimer le projet apres
    confirmation explicite rappelant son titre et le nombre de taches perdues. S'y ajoute une
-   zone de dictee en langage naturel (« Dicter a l'agent ») qui envoie la demande a
+   zone de dictee en langage naturel (« Dicter a l'agent »), un champ multiligne qui suit la
+   saisie jusqu'a une hauteur maximale puis defile comme un champ de texte ordinaire ; Entree
+   envoie la demande, Maj+Entree ajoute une ligne sans envoyer. L'envoi appelle
    `POST /api/dictee`. Cette route lance le binaire `claude` local pour transformer la phrase
    en operations structurees, que le serveur valide avant de les appliquer : le modele ne peut
    jamais envoyer de message, seulement lire et ecrire des donnees.
+
+   Sur chaque ligne de tache : une poignee (`⋮⋮`) glisser-deposer pour reordonner les taches
+   d'un projet (et, de la meme facon, les projets entre eux) ; un clic sur une cellule visible
+   (titre, statut, responsable, echeance) l'ouvre en edition en place, enregistree a la perte
+   du focus ou a la selection dans une liste deroulante, Entree validant un champ texte et
+   Echap annulant sans rien envoyer ; un bouton crayon (« Edition complete ») ouvre le meme
+   formulaire complet que pour une nouvelle tache, seul moyen de modifier l'effort et la nature
+   d'echeance (`dure` ou `souhaitee`), qui n'ont pas de cellule visible dans la ligne ; un bouton
+   croix (« Supprimer ») retire la tache immediatement et affiche un bandeau « Annuler » pendant
+   six secondes avant l'envoi effectif de la suppression ; fermer l'onglet pendant ce delai
+   vaut acceptation, la suppression encore en attente est alors envoyee immediatement via
+   `navigator.sendBeacon`, pour qu'elle ne soit jamais perdue. Le bouton `+` (« Ajouter une
+   tache ») en tete de projet ouvre ce meme formulaire complet, vide, pour une nouvelle tache.
 
    Une tache deleguee (`responsable` different de `moi`) porte deux champs de relance,
    « Derniere relance » et « Prochaine relance », visibles uniquement pour ce cas (masques des

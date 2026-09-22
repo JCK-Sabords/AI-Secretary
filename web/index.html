@@ -822,7 +822,40 @@ function renderErrors(){
     }).join('') + '</ul>';
 }
 
-function renderAll(){ renderBoard(); renderWeek(); renderRelances(); }
+// Toute reponse serveur qui arrive pendant qu'une cellule est en edition en
+// place (par exemple l'enregistrement d'une autre cellule, ou une suppression
+// differee qui aboutit) declenche un renderAll qui regenere le HTML depuis
+// l'etat. Sans precaution, le champ actif serait reconstruit avec la valeur
+// serveur, effacant la frappe non enregistree et le curseur. On capture donc
+// la saisie en cours avant le rendu et on la restitue apres, tant que la
+// meme cellule ('ie-champ') est toujours affichee en edition.
+function capturerSaisieEnPlace(){
+  var el = document.getElementById('ie-champ');
+  if (!el) return null;
+  var saisie = {value: el.value, actif: document.activeElement === el};
+  if (saisie.actif && typeof el.selectionStart === 'number') {
+    saisie.selectionStart = el.selectionStart;
+    saisie.selectionEnd = el.selectionEnd;
+  }
+  return saisie;
+}
+function restaurerSaisieEnPlace(saisie){
+  if (!saisie) return;
+  var el = document.getElementById('ie-champ');
+  if (!el) return;
+  el.value = saisie.value;
+  if (saisie.actif) {
+    el.focus();
+    if (typeof saisie.selectionStart === 'number' && el.setSelectionRange) {
+      try { el.setSelectionRange(saisie.selectionStart, saisie.selectionEnd); } catch (e) {}
+    }
+  }
+}
+function renderAll(){
+  var saisie = capturerSaisieEnPlace();
+  renderBoard(); renderWeek(); renderRelances();
+  restaurerSaisieEnPlace(saisie);
+}
 
 /* ============================ tiroir relance ============================ */
 var drawerHost = document.getElementById('drawerHost');
@@ -1191,6 +1224,28 @@ function annulerSuppression(ref){
   delete pendingDeletes[ref];
   renderAll();
 }
+// Fermer l onglet pendant le delai d annulation ne doit pas faire perdre la
+// suppression : sans ce garde-fou, la requete delete_task, prevue seulement a
+// l expiration du minuteur de six secondes, ne partait jamais et la tache
+// reapparaissait au chargement suivant alors que l utilisateur la croyait
+// supprimee. Fermer la page pendant le delai vaut acceptation : sur
+// "pagehide", on envoie donc immediatement toutes les suppressions encore en
+// attente. A ce stade du cycle de vie de la page, seul navigator.sendBeacon
+// garantit l envoi meme apres que la page a disparu (un fetch en cours serait
+// interrompu). Le serveur refuse toute ecriture dont le Content-Type n est
+// pas application/json : sendBeacon avec une chaine echapperait au controle
+// (text/plain), on lui passe donc explicitement un Blob de type
+// application/json, seule maniere de satisfaire ce garde-fou depuis
+// sendBeacon.
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('pagehide', function(){
+    var refs = Object.keys(pendingDeletes);
+    if (!refs.length) return;
+    var ops = refs.map(function(ref){ return {op: 'delete_task', ref: ref}; });
+    var blob = new Blob([JSON.stringify({ops: ops})], {type: 'application/json'});
+    navigator.sendBeacon('/api/ops', blob);
+  });
+}
 
 async function envoyerRelance(ref, btn){
   var r = (etat.relances || []).filter(function(x){ return x.ref === ref; })[0];
@@ -1525,11 +1580,17 @@ async function enregistrerCelluleTache(){
   champs[courant.champ] = nouvelleValeur;
   var data = await envoyerOps([{op: 'update_task', ref: p.prefixe + t.n, champs: champs}]);
   inlineSaving = false;
-  // Que l'enregistrement ait reussi ou non, la cellule quitte l'edition en
-  // place : en echec, envoyerOps a deja restitue l'ancien etat depuis le
-  // serveur (ou l'a laisse inchange), donc la cellule reprend sa valeur
-  // d'origine ; l'erreur a deja ete affichee via toast().
-  inlineEdit = null;
+  // Que l'enregistrement ait reussi ou non, la cellule qu'on vient d'enregistrer
+  // quitte l'edition en place : en echec, envoyerOps a deja restitue l'ancien
+  // etat depuis le serveur (ou l'a laisse inchange), donc la cellule reprend sa
+  // valeur d'origine ; l'erreur a deja ete affichee via toast(). Mais pendant
+  // l'attente reseau, l'utilisateur a pu quitter cette cellule et en ouvrir une
+  // autre (autre tache, autre champ) : inlineEdit ne doit alors etre remis a
+  // null que s'il designe toujours la cellule qu'on vient d'enregistrer, sinon
+  // on effacerait une saisie en cours ailleurs.
+  if (inlineEdit && inlineEdit.pid === courant.pid && inlineEdit.n === courant.n && inlineEdit.champ === courant.champ) {
+    inlineEdit = null;
+  }
   enregistrementEnPlaceEnCours = false;
   renderAll();
 }
@@ -1560,7 +1621,11 @@ async function enregistrerCelluleProjet(){
   champs[courant.champ] = nouvelleValeur;
   await envoyerOps([{op: 'update_project', projet: p.id, champs: champs}]);
   inlineSaving = false;
-  inlineEditProjet = null;
+  // Meme precaution que dans enregistrerCelluleTache : ne quitter l'edition en
+  // place que si elle designe toujours la cellule qu'on vient d'enregistrer.
+  if (inlineEditProjet && inlineEditProjet.pid === courant.pid && inlineEditProjet.champ === courant.champ) {
+    inlineEditProjet = null;
+  }
   enregistrementEnPlaceEnCours = false;
   renderAll();
 }
