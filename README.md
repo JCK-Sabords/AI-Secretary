@@ -284,6 +284,30 @@ projets reste donc recuperable localement.
 - **Il n'ecoute que sur `127.0.0.1`** : le serveur n'est jamais expose au reseau local ou a
   Internet.
 
+## Tableau de bord mobile, chiffre (optionnel)
+
+Un instantane en lecture seule du tableau de bord peut etre publie automatiquement, toutes
+les heures, sur un depot GitHub Pages dedie et public, pour rester consultable depuis un
+telephone quand le PC est eteint. Le depot ne contient que du contenu chiffre : la page
+`web/mobile-gabarit.html` demande un code numerique, derive la cle avec l'API WebCrypto du
+navigateur (PBKDF2-SHA256, 600 000 iterations, AES-256-GCM) et dechiffre l'instantane dans le
+navigateur, sans jamais stocker le code. Aucun identifiant de contact (`chatId`,
+`participantID`, `accountID`, fil de notes) n'entre dans l'instantane : voir
+`server/export.js` et `test/export.test.js`.
+
+Pour l'activer, ajoutez une section `exportMobile` a votre `data/config.json` (absent de
+`data.exemple`, a ne renseigner que la, jamais ailleurs) :
+
+```json
+"exportMobile": {"code": "votre-code", "depot": "votre-compte/votre-depot-pages"}
+```
+
+Puis lancez `npm run exporter-mobile` (voir `outils/exporter-mobile.js`), ou planifiez-le
+toutes les heures. L'outil clone le depot de publication dans un dossier de travail temporaire
+distinct du code et des donnees, remplace `index.html`, et pousse un commit unique en force :
+l'historique du depot public ne s'accumule jamais. Sans section `exportMobile`, l'outil ne
+publie rien et le journalise dans `data/history/export.log`, sans jamais y ecrire le code.
+
 ## Tests
 
 ```bash

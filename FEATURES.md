@@ -348,3 +348,33 @@ manquant, et 1 dans `test/repo.test.js` pour le tri par `ordre` puis `id`), aucu
 Verification manuelle steps 4 a 9 sur un projet de test cree puis supprime a la fin (aucun
 projet reel touche) : voir `.superpowers/sdd/task-19-report.md` pour le deroule complet et les
 ecarts observes.
+
+## Iteration 20 : tableau de bord mobile, chiffre (GitHub Pages)
+
+Nouvelle capacite optionnelle : publication, toutes les heures, d'un instantane en lecture
+seule du tableau de bord sur un depot GitHub Pages public et dedie, pour consultation depuis
+un telephone meme quand le PC est eteint.
+
+- `server/export.js` : `construireInstantane(dataDir, today)` reassemble l'etat (projets,
+  severite, signaux, taches ouvertes, Ma semaine, relances et relances bloquees) a partir des
+  fonctions existantes de `store`, `repo` et `people`, sans dupliquer leur logique, et retire
+  tout identifiant de contact (seul le nom d'une personne y figure) ainsi que la configuration
+  (fil de notes, code d'acces). `chiffrer`/`dechiffrer` : PBKDF2-SHA256 (sel 16 octets, 600 000
+  iterations) puis AES-256-GCM (IV 12 octets), module `crypto` natif uniquement.
+- `web/mobile-gabarit.html` : page autonome, identite visuelle « Nuit » reprise a l'identique,
+  qui demande le code, derive la cle avec WebCrypto (memes parametres que le serveur) et
+  dechiffre le paquet embarque dans le navigateur. Le code n'est jamais stocke. Affiche d'abord
+  Ma semaine et les relances, puis le portefeuille de projets depliable, avec l'heure de
+  generation bien visible en tete.
+- `outils/exporter-mobile.js` : lit `exportMobile` (`code`, `depot`) dans `data/config.json`
+  (n'agit pas si absent), publie `index.html` dans un dossier de travail temporaire distinct du
+  depot du code et de celui des donnees, avec un commit unique pousse en force (jamais
+  d'accumulation horaire). Journalise chaque passage dans `data/history/export.log`, jamais le
+  code. Ajoute comme script npm `exporter-mobile`.
+
+Suite de tests passee de 242 a 248 (6 nouveaux dans `test/export.test.js` : absence de tout
+identifiant de contact et de la configuration dans l'instantane serialise, aller-retour
+chiffrer/dechiffrer, echec propre sur mauvais code, echec sur texte altere d'un octet,
+non-repetition du sel/IV entre deux chiffrements, conformite des parametres PBKDF2/AES-GCM),
+aucune regression. Voir `.superpowers/sdd/task-20-report.md` pour le deroule complet de la
+publication et de la verification de bout en bout.

@@ -6,7 +6,8 @@
   "scripts": {
     "test": "node --test",
     "start": "node server/server.js",
-    "trouver-fil-notes": "node outils/trouver-fil-notes.js"
+    "trouver-fil-notes": "node outils/trouver-fil-notes.js",
+    "exporter-mobile": "node outils/exporter-mobile.js"
   },
   "dependencies": {
     "js-yaml": "^4.1.0"

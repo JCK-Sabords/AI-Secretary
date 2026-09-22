@@ -1,5 +1,5 @@
 {
   "proprietaire": "",
   "filNoteASoiMeme": "",
-  "commentaire": "A completer avant le premier lancement. proprietaire : votre prenom, utilise dans les prompts (dictee, agent hebdomadaire). filNoteASoiMeme : l'identifiant Beeper du fil de conversation qui vous sert de note a soi-meme ; pour le trouver, lancez Beeper Desktop, definissez la variable d'environnement BEEPER_TOKEN, puis executez `npm run trouver-fil-notes` (voir outils/trouver-fil-notes.js) et copiez ici l'identifiant affiche."
+  "commentaire": "A completer avant le premier lancement. proprietaire : votre prenom, utilise dans les prompts (dictee, agent hebdomadaire). filNoteASoiMeme : l'identifiant Beeper du fil de conversation qui vous sert de note a soi-meme ; pour le trouver, lancez Beeper Desktop, definissez la variable d'environnement BEEPER_TOKEN, puis executez `npm run trouver-fil-notes` (voir outils/trouver-fil-notes.js) et copiez ici l'identifiant affiche. exportMobile (optionnel) : section {code, depot} pour activer la publication chiffree du tableau de bord sur GitHub Pages (voir outils/exporter-mobile.js) ; absente ici volontairement, a n'ajouter que dans votre propre data/config.json, jamais dans ce fichier d'exemple."
 }
