@@ -159,11 +159,38 @@ td.date.none{color:var(--muted)}
 /* ---------- niveau 2 ---------- */
 .sub-row > td{padding:0;background:var(--surface-2);border-bottom:1px solid var(--rule)}
 .tasks{padding:4px 14px 16px 30px}
-.grid6{display:grid;grid-template-columns:56px 1fr 104px 116px 96px 46px;gap:12px;align-items:center}
+.grid8{display:grid;grid-template-columns:16px 56px 1fr 104px 116px 96px 46px 58px;gap:12px;align-items:center}
 .tasks .hd{padding:8px;font-size:10px;font-weight:700;letter-spacing:var(--sc-label);
   text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--rule)}
-.task{padding:9px 8px;border-bottom:1px solid var(--rule-soft);cursor:pointer}
+.task{padding:9px 8px;border-bottom:1px solid var(--rule-soft)}
 .task:hover{background:var(--surface)}
+.task.dragover{outline:2px dashed var(--accent);outline-offset:-2px}
+
+/* ---------- poignee de glisser-deposer, bouton d'edition complete, suppression
+   rapide : nouveau dans cette tache, reutilise uniquement les jetons existants,
+   aucune couleur ni rayon de bordure ajoutes hors du bouton rond explicitement
+   demande ---------- */
+.handle{cursor:grab;color:var(--muted);text-align:center;font-family:var(--mono);
+  font-size:12px;user-select:none;line-height:1}
+.handle:active{cursor:grabbing}
+.rowactions{display:flex;gap:4px;justify-self:end}
+.iconbtn{width:22px;height:22px;display:grid;place-items:center;background:transparent;
+  border:1px solid var(--rule);color:var(--ink-2);cursor:pointer;padding:0;font-size:12px;
+  line-height:1;flex:none}
+.iconbtn:hover{background:var(--surface-2);color:var(--ink)}
+.iconbtn.round{border-radius:50%}
+.iconbtn.danger{color:var(--crit)}
+.iconbtn.danger:hover{background:var(--crit);color:var(--surface);border-color:var(--crit)}
+.cell{cursor:pointer;border-bottom:1px dashed transparent;display:inline-block}
+.cell:hover{border-bottom-color:var(--muted)}
+.cell.saving{opacity:.55;cursor:wait}
+.cellinput{font-family:var(--body);font-size:13px;color:var(--ink);background:var(--sunken);
+  border:1px solid var(--accent);padding:3px 6px;width:100%}
+.cellinput.mono{font-family:var(--mono);font-size:12px}
+.addtask-btn{width:22px;height:22px;display:grid;place-items:center;border:1px solid var(--rule);
+  background:transparent;color:var(--ink-2);cursor:pointer;font-size:14px;line-height:1;padding:0;flex:none}
+.addtask-btn:hover{background:var(--surface-2);color:var(--ink)}
+.prow.dragover{outline:2px dashed var(--accent);outline-offset:-2px}
 .task.done .ttl{color:var(--muted);text-decoration:line-through}
 .ref{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--ink-2)}
 .ttl{font-size:14px}
@@ -249,6 +276,11 @@ textarea{font-family:var(--body);font-size:14px;line-height:1.55;color:var(--ink
 .hint code{font-family:var(--mono);font-size:11px;background:var(--surface-2);padding:1px 5px;color:var(--ink-2)}
 .agent form{display:flex;gap:8px;padding:11px 14px;border-top:1px solid var(--rule);background:var(--surface)}
 .agent input[type="text"]{flex:1}
+/* zone de dictee extensible (step 9) : largeur fixe, hauteur qui suit la saisie
+   jusqu'a un maximum, au-dela duquel elle defile comme un textarea ordinaire */
+.agent textarea{flex:1;resize:none;min-height:36px;max-height:160px;overflow-y:auto;
+  font-family:var(--body);font-size:14px;line-height:1.4;color:var(--ink);background:var(--surface);
+  border:1px solid var(--rule);padding:8px 10px;width:100%}
 .agent .send{font-family:var(--body);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
   padding:0 14px;border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);cursor:pointer}
 .agent .send:disabled{opacity:.45;cursor:not-allowed}
@@ -256,6 +288,13 @@ textarea{font-family:var(--body);font-size:14px;line-height:1.55;color:var(--ink
 .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:50;
   background:var(--ink);color:var(--paper);padding:12px 18px;font-size:13px;display:flex;align-items:center;gap:10px}
 .toast .dot{width:7px;height:7px;background:var(--ok);display:block}
+.toast .btn{margin-left:4px}
+/* pile de bandeaux d'annulation de suppression de tache (step 5) : chacun garde
+   son propre delai, donc plusieurs peuvent s'empiler ici en meme temps, distincts
+   du toast() habituel (#toastHost, un seul message a la fois) */
+#undoHost{position:fixed;left:50%;bottom:70px;transform:translateX(-50%);z-index:51;
+  display:flex;flex-direction:column;gap:8px;align-items:center}
+#undoHost .toast{position:static;left:auto;bottom:auto;transform:none}
 @media (prefers-reduced-motion:no-preference){
   .toast{animation:rise .22s ease-out}
   @keyframes rise{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
@@ -309,7 +348,7 @@ footer.legalese{margin-top:40px;padding-top:16px;border-top:1px solid var(--rule
   <div class="tbl-scroll">
     <table>
       <thead><tr>
-        <th></th><th>Projet</th><th>Échéance</th><th>Prochaine action</th><th></th>
+        <th></th><th></th><th>Projet</th><th>Échéance</th><th>Prochaine action</th><th></th><th></th>
       </tr></thead>
       <tbody id="board"></tbody>
     </table>
@@ -338,13 +377,14 @@ footer.legalese{margin-top:40px;padding-top:16px;border-top:1px solid var(--rule
     </div>
   </div>
   <form id="agentForm">
-    <input type="text" id="agentInput" placeholder="Dicte une demande en langage naturel..." autocomplete="off">
+    <textarea id="agentInput" rows="1" placeholder="Dicte une demande en langage naturel... (Entrée envoie, Maj+Entrée ajoute une ligne)"></textarea>
     <button class="send" type="submit" id="agentSend">Envoyer</button>
   </form>
 </section>
 
 <div id="drawerHost"></div>
 <div id="toastHost"></div>
+<div id="undoHost"></div>
 
 <script>
 /* ============================ etat ============================ */
@@ -419,6 +459,10 @@ function sevLabel(sev){
 /* ============================ niveau 2 ============================ */
 var openProjects = {};   /* id -> true */
 var editing = null;      /* {pid, n} ; n === 0 = nouvelle tache */
+var inlineEdit = null;   /* {pid, n, champ} : edition en place d'une seule cellule de tache */
+var inlineEditProjet = null; /* {pid, champ} : edition en place d'une seule cellule de projet */
+var inlineSaving = false;    /* vrai pendant l'enregistrement d'une cellule en place */
+var pendingDeletes = {};     /* ref -> {timer, div} : suppressions de tache en sursis (step 5) */
 
 function respHtml(responsable){
   if (responsable === 'moi') {
@@ -436,15 +480,58 @@ function dateHtml(t){
   return '<span class="tdate ' + (late ? 'late' : (t.nature_echeance === 'souhaitee' ? 'soft' : '')) + '">' +
     frDate(t.echeance) + '</span>';
 }
+// Une seule cellule d'une tache en edition en place (step 6) : le champ est
+// affiche comme entree/liste/date selon sa nature, et enregistre a Entree ou a
+// la perte du focus (voir l'ecouteur delegue plus bas), jamais au clic seul.
+function inlineTaskCellActive(p, t, champ){
+  return !!inlineEdit && inlineEdit.pid === p.id && inlineEdit.n === t.n && inlineEdit.champ === champ;
+}
+function celluleTache(p, t, champ, affichageHtml){
+  if (inlineTaskCellActive(p, t, champ)) {
+    var attrsSauv = 'data-inline-save="' + esc(p.id) + ':' + t.n + ':' + champ + '"';
+    var cls = inlineSaving ? ' cellinput saving' : ' cellinput';
+    if (champ === 'titre') {
+      return '<input type="text" class="' + cls.trim() + '" id="ie-champ" ' + attrsSauv +
+        ' value="' + esc(t.titre) + '"' + (inlineSaving ? ' disabled' : '') + '>';
+    }
+    if (champ === 'statut') {
+      return '<select class="' + cls.trim() + '" id="ie-champ" ' + attrsSauv + (inlineSaving ? ' disabled' : '') + '>' +
+        opts(STATUT, t.statut) + '</select>';
+    }
+    if (champ === 'prio') {
+      return '<select class="' + cls.trim() + '" id="ie-champ" ' + attrsSauv + (inlineSaving ? ' disabled' : '') + '>' +
+        opts({P1:'P1', P2:'P2', P3:'P3', P4:'P4'}, t.prio) + '</select>';
+    }
+    if (champ === 'responsable') {
+      var respMap = {moi:'Moi'};
+      etat.people.forEach(function(per){ respMap[per.id] = per.nom; });
+      return '<select class="' + cls.trim() + '" id="ie-champ" ' + attrsSauv + (inlineSaving ? ' disabled' : '') + '>' +
+        opts(respMap, t.responsable) + '</select>';
+    }
+    if (champ === 'echeance') {
+      return '<input type="date" class="' + cls.trim() + ' mono" id="ie-champ" ' + attrsSauv +
+        ' value="' + esc(t.echeance) + '"' + (inlineSaving ? ' disabled' : '') + '>';
+    }
+    return affichageHtml;
+  }
+  return '<span class="cell" data-cell="' + esc(p.id) + ':' + t.n + ':' + champ + '">' + affichageHtml + '</span>';
+}
 function taskHtml(p, t){
   var doneCls = (t.statut === 'fait' || t.statut === 'abandonne') ? ' done' : '';
-  return '<div class="task grid6' + doneCls + '" data-edit="' + esc(p.id) + ':' + t.n + '">' +
-    '<span class="ref">' + esc(refOf(p, t)) + '</span>' +
-    '<span class="ttl">' + esc(t.titre) + '</span>' +
-    '<span><span class="pill ' + esc(t.statut.replace('_', '')) + '">' +
-      esc(STATUT[t.statut] || t.statut) + '</span></span>' +
-    respHtml(t.responsable) + dateHtml(t) +
-    '<span class="prio ' + esc(t.prio.toLowerCase()) + '">' + esc(t.prio) + '</span>' +
+  var ref = refOf(p, t);
+  return '<div class="task grid8' + doneCls + '" data-ref="' + esc(ref) + '" data-pid="' + esc(p.id) + '" data-n="' + t.n + '">' +
+    '<span class="handle" draggable="true" data-drag-task="' + esc(p.id) + ':' + t.n + '" title="Glisser pour réordonner">⋮⋮</span>' +
+    '<span class="ref">' + esc(ref) + '</span>' +
+    celluleTache(p, t, 'titre', '<span class="ttl">' + esc(t.titre) + '</span>') +
+    celluleTache(p, t, 'statut', '<span class="pill ' + esc(t.statut.replace('_', '')) + '">' +
+      esc(STATUT[t.statut] || t.statut) + '</span>') +
+    celluleTache(p, t, 'responsable', respHtml(t.responsable)) +
+    celluleTache(p, t, 'echeance', dateHtml(t)) +
+    celluleTache(p, t, 'prio', '<span class="prio ' + esc(t.prio.toLowerCase()) + '">' + esc(t.prio) + '</span>') +
+    '<span class="rowactions">' +
+      '<button class="iconbtn round" type="button" data-edit="' + esc(p.id) + ':' + t.n + '" title="Édition complète">✎</button>' +
+      '<button class="iconbtn danger" type="button" data-quickdel="' + esc(p.id) + ':' + t.n + '" title="Supprimer">×</button>' +
+    '</span>' +
     (t.note_blocage ? '<span class="blocked-note">' + esc(t.note_blocage) + '</span>' : '') +
   '</div>';
 }
@@ -502,7 +589,7 @@ function editorHtml(p, t){
   // explicite qui, lui, l'emporte reellement (le style en ligne prime sur toute
   // regle de feuille de style, quelle que soit sa specificite).
   var relanceHidden = t.responsable === 'moi' ? ' hidden style="display:none"' : '';
-  return '<div class="task grid6"><div class="editor">' +
+  return '<div class="task grid8"><div class="editor">' +
     '<div class="erow">' +
       '<div class="f grow"><label class="k" for="e-titre">' +
         (isNew ? 'Nouvelle tâche' : 'Tâche ' + esc(refOf(p, t))) + '</label>' +
@@ -537,30 +624,48 @@ function editorHtml(p, t){
     '</div></div></div>';
 }
 function tasksHtml(p){
-  var body = (p.taches || []).map(function(t){
+  var visibles = (p.taches || []).filter(function(t){ return !pendingDeletes[refOf(p, t)]; });
+  var body = visibles.map(function(t){
     if (editing && editing.pid === p.id && editing.n === t.n) return editorHtml(p, t);
     return taskHtml(p, t);
   }).join('');
   if (!body) body = '<div class="empty-tasks">Aucune tâche pour l\'instant.</div>';
   var creating = editing && editing.pid === p.id && editing.n === 0;
-  // "Modifier le projet" reste visible meme pendant la creation d'une tache (il
-  // ouvre un tiroir distinct, sans lien avec l'editeur de tache en place) ;
-  // "Ajouter une tache" s'efface le temps que l'editeur de creation est affiche,
-  // comme avant cette tache.
+  // Les boutons textuels "Ajouter une tache" et "Modifier le projet" ont ete
+  // retires (step 8) : le premier est remplace par le bouton compact "+" de la
+  // ligne de projet, le second par le bouton rond d'edition complete de cette
+  // meme ligne (voir renderBoard).
   return '<div class="tasks">' +
-    '<div class="hd grid6"><span>Réf.</span><span>Tâche</span><span>Statut</span>' +
-      '<span>Responsable</span><span>Échéance</span><span>Prio</span></div>' +
+    '<div class="hd grid8"><span></span><span>Réf.</span><span>Tâche</span><span>Statut</span>' +
+      '<span>Responsable</span><span>Échéance</span><span>Prio</span><span></span></div>' +
     body + (creating ? editorHtml(p, null) : '') +
-    '<div class="foot">' +
-      (creating ? '' : '<button class="btn ghost" type="button" data-new="' + esc(p.id) + '">Ajouter une tâche</button>') +
-      '<button class="btn ghost" type="button" data-edit-project="' + esc(p.id) + '">Modifier le projet</button>' +
-    '</div>' +
   '</div>';
 }
 
 /* ============================ niveau 1 ============================ */
 var board = document.getElementById('board');
 var filter = 'tout';
+
+// Meme principe que celluleTache, pour les trois champs de projet editables en
+// place (step 6, deuxieme partie) : titre, echeance, prochaine action.
+function inlineProjetCellActive(p, champ){
+  return !!inlineEditProjet && inlineEditProjet.pid === p.id && inlineEditProjet.champ === champ;
+}
+function celluleProjet(p, champ, affichageHtml, classe){
+  if (inlineProjetCellActive(p, champ)) {
+    var attrsSauv = 'data-inline-save-projet="' + esc(p.id) + ':' + champ + '"';
+    var cls = (inlineSaving ? 'cellinput saving' : 'cellinput');
+    if (champ === 'echeance') {
+      return '<input type="date" class="' + cls + ' mono" id="ie-champ" ' + attrsSauv +
+        ' value="' + esc(p.echeance) + '"' + (inlineSaving ? ' disabled' : '') + '>';
+    }
+    var val = champ === 'titre' ? p.titre : p.prochaine_action;
+    return '<input type="text" class="' + cls + '" id="ie-champ" ' + attrsSauv +
+      ' value="' + esc(val) + '"' + (inlineSaving ? ' disabled' : '') + '>';
+  }
+  return '<span class="cell' + (classe ? ' ' + classe : '') + '" data-cell-projet="' + esc(p.id) + ':' + champ + '">' +
+    affichageHtml + '</span>';
+}
 
 function renderBoard(){
   board.innerHTML = '';
@@ -571,24 +676,35 @@ function renderBoard(){
     var isOpen = !!openProjects[p.id];
     var domCls = String(p.domaine || '').replace(/[^a-z0-9_-]/gi, '');
 
+    var titreHtml = celluleProjet(p, 'titre', '<b>' + esc(p.titre) + '</b>');
+    var echHtml = celluleProjet(p, 'echeance',
+      p.echeance === '' ? 'sans date' : frDate(p.echeance));
+    var nextHtml = celluleProjet(p, 'prochaine_action',
+      p.prochaine_action === '' ? 'aucune prochaine action définie' : esc(p.prochaine_action));
+
     var tr = document.createElement('tr');
     tr.className = 'prow';
     tr.tabIndex = 0;
     tr.setAttribute('aria-expanded', String(isOpen));
+    tr.setAttribute('data-pid', p.id);
     tr.innerHTML =
+      '<td class="handle" draggable="true" data-drag-project="' + esc(p.id) + '" title="Glisser pour réordonner">⋮⋮</td>' +
       '<td class="sev"><span class="sevbar ' + sevClass(sev) + '" title="' + esc(sevLabel(sev)) + '"></span></td>' +
-      '<td><div class="pname"><b>' + esc(p.titre) + '</b><span class="dom ' + esc(domCls) + '">' +
+      '<td><div class="pname">' + titreHtml + '<span class="dom ' + esc(domCls) + '">' +
         (p.domaine === 'pro' ? 'Jira ' + esc(p.jira) : esc(p.prefixe) + ' · ' + esc(p.domaine)) + '</span></div></td>' +
-      '<td class="date ' + (late ? 'late' : (p.echeance === '' ? 'none' : '')) + '">' +
-        (p.echeance === '' ? 'sans date' : frDate(p.echeance)) + '</td>' +
-      '<td class="next' + (p.prochaine_action === '' ? ' empty' : '') + '">' +
-        (p.prochaine_action === '' ? 'aucune prochaine action définie' : esc(p.prochaine_action)) + '</td>' +
+      '<td class="date ' + (late ? 'late' : (p.echeance === '' ? 'none' : '')) + '">' + echHtml + '</td>' +
+      '<td class="next' + (p.prochaine_action === '' ? ' empty' : '') + '">' + nextHtml + '</td>' +
+      '<td class="rowactions">' +
+        '<button class="addtask-btn" type="button" data-quickadd="' + esc(p.id) + '" title="Ajouter une tâche">+</button>' +
+        '<button class="iconbtn round" type="button" data-edit-project="' + esc(p.id) + '" title="Modifier le projet">✎</button>' +
+        '<button class="iconbtn danger" type="button" data-quickdel-project="' + esc(p.id) + '" title="Supprimer le projet">×</button>' +
+      '</td>' +
       '<td class="chev">' + (isOpen ? '−' : '+') + '</td>';
 
     var sub = document.createElement('tr');
     sub.className = 'sub-row';
     sub.hidden = !isOpen;
-    sub.innerHTML = '<td colspan="5">' + tasksHtml(p) + '</td>';
+    sub.innerHTML = '<td colspan="7">' + tasksHtml(p) + '</td>';
 
     function toggle(){
       if (openProjects[p.id]) { delete openProjects[p.id]; if (editing && editing.pid === p.id) editing = null; }
@@ -1019,7 +1135,11 @@ async function saveProjectDrawer(existingId){
   if (data.ok && data.applied && data.applied.length) closeDrawer();
 }
 
-function deleteProjectDrawer(projectId){
+// Confirmation systematique pour un projet (jamais de suppression a l'aveugle,
+// contrairement au bouton rapide de tache qui, lui, repose sur l'annulation en
+// six secondes) : rappelle le titre et le nombre de taches perdues, que l'appel
+// vienne du bouton rapide de la ligne ou du tiroir de projet.
+function deleteProjectConfirm(projectId){
   var p = projectById(projectId);
   if (!p) return;
   var n = (p.taches || []).length;
@@ -1033,6 +1153,43 @@ function deleteProjectDrawer(projectId){
       renderAll();
     }
   });
+}
+function deleteProjectDrawer(projectId){ deleteProjectConfirm(projectId); }
+
+/* ============================ suppression rapide de tache, avec annulation (step 5) ============================
+   Un clic fait disparaitre la tache immediatement (filtree dans tasksHtml via
+   pendingDeletes) et arme un bandeau d'annulation pendant six secondes ; la
+   requete delete_task n'est envoyee qu'a l'expiration de ce delai. Chaque tache
+   supprimee en rafale garde son propre minuteur et son propre bandeau, empiles
+   dans #undoHost. */
+function supprimerTacheRapide(projetId, n){
+  var p = projectById(projetId);
+  if (!p) return;
+  var ref = p.prefixe + n;
+  if (pendingDeletes[ref]) return;
+  if (editing && editing.pid === projetId && editing.n === n) editing = null;
+  if (inlineEdit && inlineEdit.pid === projetId && inlineEdit.n === n) inlineEdit = null;
+  pendingDeletes[ref] = {};
+  renderAll();
+  var div = document.createElement('div');
+  div.className = 'toast';
+  div.innerHTML = '<span class="dot"></span>Tâche ' + esc(ref) + ' supprimée.' +
+    '<button class="btn ghost" type="button" data-undo="' + esc(ref) + '">Annuler</button>';
+  document.getElementById('undoHost').appendChild(div);
+  pendingDeletes[ref].div = div;
+  pendingDeletes[ref].timer = setTimeout(function(){
+    if (div.parentNode) div.remove();
+    delete pendingDeletes[ref];
+    envoyerOps([{op: 'delete_task', ref: ref}]);
+  }, 6000);
+}
+function annulerSuppression(ref){
+  var pd = pendingDeletes[ref];
+  if (!pd) return;
+  clearTimeout(pd.timer);
+  if (pd.div && pd.div.parentNode) pd.div.remove();
+  delete pendingDeletes[ref];
+  renderAll();
 }
 
 async function envoyerRelance(ref, btn){
@@ -1176,6 +1333,47 @@ document.addEventListener('click', function(e){
     openProjectDrawer(el.getAttribute('data-edit-project'));
     return;
   }
+  if ((el = e.target.closest('[data-quickdel-project]'))) {
+    e.stopPropagation();
+    deleteProjectConfirm(el.getAttribute('data-quickdel-project'));
+    return;
+  }
+  if ((el = e.target.closest('[data-quickadd]'))) {
+    e.stopPropagation();
+    var pidQA = el.getAttribute('data-quickadd');
+    openProjects[pidQA] = true;
+    editing = {pid: pidQA, n: 0};
+    renderAll();
+    var fQA = document.getElementById('e-titre'); if (fQA) fQA.focus();
+    return;
+  }
+  if ((el = e.target.closest('[data-quickdel]'))) {
+    e.stopPropagation();
+    var qd = el.getAttribute('data-quickdel').split(':');
+    supprimerTacheRapide(qd[0], Number(qd[1]));
+    return;
+  }
+  if ((el = e.target.closest('[data-undo]'))) {
+    annulerSuppression(el.getAttribute('data-undo'));
+    return;
+  }
+  if (e.target.closest('.handle')) { e.stopPropagation(); return; }
+  if ((el = e.target.closest('[data-cell-projet]'))) {
+    e.stopPropagation();
+    var cp = el.getAttribute('data-cell-projet').split(':');
+    inlineEditProjet = {pid: cp[0], champ: cp[1]};
+    renderAll();
+    focusInlineInput();
+    return;
+  }
+  if ((el = e.target.closest('[data-cell]'))) {
+    e.stopPropagation();
+    var cc = el.getAttribute('data-cell').split(':');
+    inlineEdit = {pid: cc[0], n: Number(cc[1]), champ: cc[2]};
+    renderAll();
+    focusInlineInput();
+    return;
+  }
   if ((el = e.target.closest('[data-save-project]'))) {
     saveProjectDrawer(el.getAttribute('data-save-project') || null);
     return;
@@ -1266,10 +1464,120 @@ async function saveEditor(projetId, n){
 }
 
 document.addEventListener('keydown', function(e){
-  if (e.key === 'Escape') { closeDrawer(); if (editing) { editing = null; renderAll(); } }
+  if (e.key === 'Escape') {
+    closeDrawer();
+    if (editing) { editing = null; renderAll(); }
+    if (e.target && e.target.id === 'ie-champ') { annulerEditionEnPlace(); }
+  }
   if (e.key === 'Enter' && e.target && e.target.id === 'rc-nom') {
     e.preventDefault();
     chercherContactsDrawer();
+  }
+  if (e.key === 'Enter' && e.target && e.target.id === 'ie-champ' && e.target.tagName !== 'SELECT') {
+    e.preventDefault();
+    e.target.blur();
+  }
+});
+
+/* ============================ edition en place, tache et projet (step 6) ============================ */
+function focusInlineInput(){
+  var el = document.getElementById('ie-champ');
+  if (el) { el.focus(); if (el.select) el.select(); }
+}
+// Echap n'envoie jamais rien : on efface simplement l'etat d'edition en place et
+// on rend a nouveau, sans passer par l'ecouteur "blur" (qui, lui, enregistre).
+var annulationEnPlaceEnCours = false;
+function annulerEditionEnPlace(){
+  annulationEnPlaceEnCours = true;
+  inlineEdit = null;
+  inlineEditProjet = null;
+  renderAll();
+  annulationEnPlaceEnCours = false;
+}
+var enregistrementEnPlaceEnCours = false;
+async function enregistrerCelluleTache(){
+  if (!inlineEdit || annulationEnPlaceEnCours || enregistrementEnPlaceEnCours) return;
+  enregistrementEnPlaceEnCours = true;
+  var courant = inlineEdit;
+  var el = document.getElementById('ie-champ');
+  if (!el) return;
+  var p = projectById(courant.pid);
+  if (!p) { inlineEdit = null; enregistrementEnPlaceEnCours = false; renderAll(); return; }
+  var t = (p.taches || []).filter(function(x){ return x.n === courant.n; })[0];
+  if (!t) { inlineEdit = null; enregistrementEnPlaceEnCours = false; renderAll(); return; }
+  var nouvelleValeur = courant.champ === 'titre' ? el.value.trim() : el.value;
+  if (courant.champ === 'titre' && !nouvelleValeur) {
+    toast('Il faut un intitulé');
+    el.focus();
+    enregistrementEnPlaceEnCours = false;
+    return;
+  }
+  // Un enregistrement qui ne change pas la valeur n'envoie aucune requete.
+  if (nouvelleValeur === (t[courant.champ] || '')) {
+    inlineEdit = null;
+    enregistrementEnPlaceEnCours = false;
+    renderAll();
+    return;
+  }
+  inlineSaving = true;
+  renderAll();
+  var champs = {};
+  champs[courant.champ] = nouvelleValeur;
+  var data = await envoyerOps([{op: 'update_task', ref: p.prefixe + t.n, champs: champs}]);
+  inlineSaving = false;
+  // Que l'enregistrement ait reussi ou non, la cellule quitte l'edition en
+  // place : en echec, envoyerOps a deja restitue l'ancien etat depuis le
+  // serveur (ou l'a laisse inchange), donc la cellule reprend sa valeur
+  // d'origine ; l'erreur a deja ete affichee via toast().
+  inlineEdit = null;
+  enregistrementEnPlaceEnCours = false;
+  renderAll();
+}
+async function enregistrerCelluleProjet(){
+  if (!inlineEditProjet || annulationEnPlaceEnCours || enregistrementEnPlaceEnCours) return;
+  enregistrementEnPlaceEnCours = true;
+  var courant = inlineEditProjet;
+  var el = document.getElementById('ie-champ');
+  if (!el) { enregistrementEnPlaceEnCours = false; return; }
+  var p = projectById(courant.pid);
+  if (!p) { inlineEditProjet = null; enregistrementEnPlaceEnCours = false; renderAll(); return; }
+  var nouvelleValeur = courant.champ === 'echeance' ? el.value : el.value.trim();
+  if (courant.champ === 'titre' && !nouvelleValeur) {
+    toast('Il faut un titre');
+    el.focus();
+    enregistrementEnPlaceEnCours = false;
+    return;
+  }
+  if (nouvelleValeur === (p[courant.champ] || '')) {
+    inlineEditProjet = null;
+    enregistrementEnPlaceEnCours = false;
+    renderAll();
+    return;
+  }
+  inlineSaving = true;
+  renderAll();
+  var champs = {};
+  champs[courant.champ] = nouvelleValeur;
+  await envoyerOps([{op: 'update_project', projet: p.id, champs: champs}]);
+  inlineSaving = false;
+  inlineEditProjet = null;
+  enregistrementEnPlaceEnCours = false;
+  renderAll();
+}
+document.addEventListener('focusout', function(e){
+  if (e.target && e.target.id === 'ie-champ' && !annulationEnPlaceEnCours) {
+    if (inlineEdit) enregistrerCelluleTache();
+    else if (inlineEditProjet) enregistrerCelluleProjet();
+  }
+});
+// Les listes deroulantes (statut, priorite, responsable) enregistrent des le
+// choix (evenement "change"), sans attendre une perte de focus qui, en pratique,
+// suit immediatement le choix au clavier comme a la souris ; meme fonction que
+// pour la perte de focus, le resultat est identique.
+document.addEventListener('change', function(e){
+  if (e.target && e.target.id === 'ie-champ' && e.target.tagName === 'SELECT') {
+    if (inlineEdit) enregistrerCelluleTache();
+    else if (inlineEditProjet) enregistrerCelluleProjet();
   }
 });
 
@@ -1410,6 +1718,7 @@ agentFormEl.addEventListener('submit', function(e){
   var texte = agentInputEl.value.trim();
   if (!texte) return;
   agentInputEl.value = '';
+  agentInputEl.style.height = 'auto';
   envoyerDictee(texte);
 });
 
@@ -1588,6 +1897,106 @@ voyantClaudeEl.addEventListener('click', testerClaudeReel);
 verifierBeeper();
 demarrerSurveillanceBeeper();
 controlerClaudeAuChargement();
+
+/* ============================ glisser-deposer par une poignee (step 4) ============================
+   Glisser-depose natif du navigateur, sans bibliotheque : seule la poignee porte
+   draggable="true" (voir taskHtml et renderBoard), le reste de la ligne garde son
+   comportement habituel (bascule, edition en place...). Au lacher, envoie
+   reorder_projects ou reorder_tasks via applyOps, jamais de voie parallele. Une
+   tache ne peut etre deposee que dans son propre projet (verifie via data-pid). */
+var dragProjectId = null;
+var dragTaskInfo = null; /* {pid, n} */
+
+function deplacerProjet(sourceId, targetId){
+  var ids = etat.projects.map(function(p){ return p.id; });
+  var from = ids.indexOf(sourceId), to = ids.indexOf(targetId);
+  if (from < 0 || to < 0 || from === to) return;
+  ids.splice(from, 1);
+  ids.splice(to, 0, sourceId);
+  envoyerOps([{op: 'reorder_projects', ids: ids}]);
+}
+function deplacerTache(pid, sourceN, targetN){
+  var p = projectById(pid);
+  if (!p) return;
+  var ns = (p.taches || []).map(function(t){ return t.n; });
+  var from = ns.indexOf(sourceN), to = ns.indexOf(targetN);
+  if (from < 0 || to < 0 || from === to) return;
+  ns.splice(from, 1);
+  ns.splice(to, 0, sourceN);
+  envoyerOps([{op: 'reorder_tasks', projet: pid, ordre: ns}]);
+}
+
+document.addEventListener('dragstart', function(e){
+  var h;
+  if ((h = e.target.closest('[data-drag-project]'))) {
+    dragProjectId = h.getAttribute('data-drag-project');
+    if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragProjectId); }
+  } else if ((h = e.target.closest('[data-drag-task]'))) {
+    var parts = h.getAttribute('data-drag-task').split(':');
+    dragTaskInfo = {pid: parts[0], n: Number(parts[1])};
+    if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', parts.join(':')); }
+  }
+});
+document.addEventListener('dragover', function(e){
+  if (dragProjectId) {
+    var tr = e.target.closest('tr.prow');
+    if (tr) { e.preventDefault(); tr.classList.add('dragover'); }
+  } else if (dragTaskInfo) {
+    var task = e.target.closest('.task');
+    if (task && task.getAttribute('data-pid') === dragTaskInfo.pid) {
+      e.preventDefault();
+      task.classList.add('dragover');
+    }
+  }
+});
+document.addEventListener('dragleave', function(e){
+  var el = e.target.closest('tr.prow, .task');
+  if (el) el.classList.remove('dragover');
+});
+document.addEventListener('drop', function(e){
+  if (dragProjectId) {
+    var tr = e.target.closest('tr.prow');
+    if (tr) {
+      e.preventDefault();
+      tr.classList.remove('dragover');
+      var targetId = tr.getAttribute('data-pid');
+      if (targetId && targetId !== dragProjectId) deplacerProjet(dragProjectId, targetId);
+    }
+    dragProjectId = null;
+  } else if (dragTaskInfo) {
+    var task = e.target.closest('.task');
+    if (task && task.getAttribute('data-pid') === dragTaskInfo.pid) {
+      e.preventDefault();
+      task.classList.remove('dragover');
+      var targetN = Number(task.getAttribute('data-n'));
+      if (targetN !== dragTaskInfo.n) deplacerTache(dragTaskInfo.pid, dragTaskInfo.n, targetN);
+    }
+    dragTaskInfo = null;
+  }
+});
+document.addEventListener('dragend', function(){
+  dragProjectId = null;
+  dragTaskInfo = null;
+  Array.prototype.forEach.call(document.querySelectorAll('.dragover'), function(x){ x.classList.remove('dragover'); });
+});
+
+/* ============================ dictee extensible (step 9) ============================
+   Hauteur suivant la saisie (jamais la largeur), jusqu'a max-height (CSS), au-dela
+   de laquelle le champ defile. Entree envoie, Maj+Entree ajoute une ligne. Apres
+   envoi, la hauteur revient a sa valeur initiale (voir envoyerDictee/submit ci-dessous).
+*/
+function redimensionnerDictee(){
+  agentInputEl.style.height = 'auto';
+  agentInputEl.style.height = agentInputEl.scrollHeight + 'px';
+}
+agentInputEl.addEventListener('input', redimensionnerDictee);
+agentInputEl.addEventListener('keydown', function(e){
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    if (agentFormEl.requestSubmit) agentFormEl.requestSubmit();
+    else agentFormEl.dispatchEvent(new Event('submit', {cancelable: true}));
+  }
+});
 
 charger();
 </script>

@@ -300,3 +300,51 @@ dans `test/server.test.js`), aucune regression. Verification manuelle d'une inst
 serveur) : voir `.superpowers/sdd/task-16-report.md` pour le deroule complet et les eventuels
 ecarts observes. Aucune donnee reelle n'a ete supprimee du disque de l'installation existante,
 et aucun message n'est parti sur Beeper pendant cette tache.
+
+## Iteration 7 : 22 septembre 2026
+
+Tache 19 : six interactions rapides du tableau de bord, pour que les modifications
+quotidiennes les plus frequentes (reordonner, supprimer une tache, corriger un champ) ne
+passent plus systematiquement par un formulaire complet.
+
+- **`server/store.js`** : nouveau champ `ordre` (entier) sur les projets, avec sa valeur par
+  defaut dans `PROJECT_DEFAULTS`. Deux nouvelles operations dans `applyOps`, seule porte
+  d'ecriture du systeme : `reorder_projects` (`{ids}`) et `reorder_tasks` (`{projet, ordre}`),
+  toutes deux refusees proprement (dans `rejected`, sans effet de bord) si la liste fournie
+  n'est pas exactement une permutation des elements existants. Aucune des deux ne touche au
+  numero `n` d'une tache ni a `dernier_n` : une reference designe toujours la meme tache.
+- **`server/repo.js`** : `loadAll` et `loadAllSafe` trient desormais par `ordre` croissant puis
+  par `id` a egalite, pour que les projets sans ordre explicite restent stables.
+- **`web/index.html`**, interface :
+  - une poignee (`⋮⋮`) a l'extreme gauche de chaque ligne de projet et de tache declenche seule
+    le glisser-deposer natif du navigateur (aucune bibliotheque) ; au lacher, `reorder_projects`
+    ou `reorder_tasks` est envoye via `applyOps` comme toute autre operation. Une tache ne peut
+    etre deposee que dans son propre projet.
+  - un bouton de suppression rapide sur chaque ligne de tache fait disparaitre la tache de
+    l'ecran immediatement et arme un bandeau d'annulation independant pendant six secondes
+    (plusieurs suppressions en rafale gardent chacune leur propre delai, empilees dans
+    `#undoHost`) ; la requete `delete_task` n'est envoyee qu'a l'expiration du delai, jamais si
+    l'utilisateur clique sur Annuler. Un projet garde sa confirmation existante (titre, nombre
+    de taches perdues), desormais accessible aussi depuis un bouton rapide de la ligne.
+  - edition en place : un clic sur le titre, le statut, la priorite, le responsable ou
+    l'echeance d'une tache (et sur le titre, l'echeance ou la prochaine action d'un projet)
+    transforme cette seule cellule en champ ou liste deroulante ; Entree ou perte de focus
+    enregistre via `update_task`/`update_project`, Echap annule sans requete, un enregistrement
+    qui ne change rien n'envoie rien non plus. Nature d'echeance et effort restent sans cellule
+    dediee dans la maquette verrouillee : voir les reserves du rapport de tache.
+  - un bouton rond (`✎`), a cote du bouton de suppression, est desormais seul a ouvrir
+    l'editeur complet d'une tache ou le tiroir complet d'un projet ; un clic ailleurs sur la
+    ligne ouvre l'edition en place ou deplie le projet, jamais plus l'editeur complet.
+  - les boutons textuels « Ajouter une tache » et « Modifier le projet » ont disparu,
+    remplaces par, respectivement, un bouton compact « + » sur la ligne de projet et le bouton
+    rond ci-dessus.
+  - la zone de dictee est un `textarea` qui s'agrandit en hauteur avec la saisie jusqu'a une
+    hauteur maximale (au-dela, elle defile), jamais en largeur ; Entree envoie, Maj+Entree ajoute
+    une ligne, la hauteur revient a l'origine apres envoi.
+
+Suite de tests passee de 234 a 242 (7 nouveaux dans `test/store.ops.test.js` pour
+`reorder_projects`/`reorder_tasks`, dont les refus sur identifiant inconnu, doublon et element
+manquant, et 1 dans `test/repo.test.js` pour le tri par `ordre` puis `id`), aucune regression.
+Verification manuelle steps 4 a 9 sur un projet de test cree puis supprime a la fin (aucun
+projet reel touche) : voir `.superpowers/sdd/task-19-report.md` pour le deroule complet et les
+ecarts observes.
