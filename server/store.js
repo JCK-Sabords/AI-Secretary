@@ -15,7 +15,7 @@ const TASK_DEFAULTS = {
 
 const PROJECT_DEFAULTS = {
   id: '', prefixe: '', titre: '', domaine: 'side', statut: 'actif',
-  echeance: '', prochaine_action: '', jira: '', dernier_n: 0
+  echeance: '', prochaine_action: '', jira: '', dernier_n: 0, ordre: 0
 };
 
 function parseProject(text) {
@@ -345,6 +345,36 @@ function applyOps(projects, ops, today) {
         if (!Object.keys(champs).length) return rejected.push('aucun champ a modifier');
         Object.assign(p, champs);
         applied.push('~ projet ' + p.titre);
+
+      } else if (op === 'reorder_projects') {
+        const ids = Array.isArray(o.ids) ? o.ids : null;
+        if (!ids) return rejected.push('liste ids manquante');
+        const existants = etat.map((x) => x.id);
+        const memeEnsemble = ids.length === existants.length &&
+          new Set(ids).size === ids.length &&
+          existants.every((id) => ids.includes(id));
+        if (!memeEnsemble) {
+          return rejected.push('reorder_projects : la liste doit etre une permutation exacte des projets existants');
+        }
+        ids.forEach((id, i) => {
+          etat.find((x) => x.id === id).ordre = i;
+        });
+        applied.push('= ordre des projets');
+
+      } else if (op === 'reorder_tasks') {
+        const p = etat.find((x) => x.id === o.projet || x.prefixe === o.projet);
+        if (!p) return rejected.push('projet inconnu : ' + o.projet);
+        const ordre = Array.isArray(o.ordre) ? o.ordre : null;
+        if (!ordre) return rejected.push('liste ordre manquante');
+        const existants = p.taches.map((t) => t.n);
+        const memeEnsemble = ordre.length === existants.length &&
+          new Set(ordre).size === ordre.length &&
+          existants.every((n) => ordre.includes(n));
+        if (!memeEnsemble) {
+          return rejected.push('reorder_tasks : la liste doit etre une permutation exacte des taches du projet');
+        }
+        p.taches = ordre.map((n) => p.taches.find((t) => t.n === n));
+        applied.push('= ordre des taches de ' + p.prefixe);
 
       } else if (op === 'delete_project') {
         const p = etat.find((x) => x.id === o.projet || x.prefixe === o.projet);

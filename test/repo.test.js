@@ -214,3 +214,16 @@ test('commit ne ramasse jamais un fichier situe hors du dossier de donnees', () 
   assert.ok(suivis.includes('fichier.txt'));
   assert.ok(!suivis.some((f) => f.includes('parasite')), 'rien hors de data/ ne doit etre commite');
 });
+
+test('loadAll et loadAllSafe trient par ordre croissant puis par id a egalite', () => {
+  const dir = tmpdir();
+  repo.saveProject(dir, Object.assign(projetDemo(), {id: 'zebre', ordre: 1}));
+  repo.saveProject(dir, Object.assign(projetDemo(), {id: 'alpha', ordre: 1}));
+  repo.saveProject(dir, Object.assign(projetDemo(), {id: 'beta', ordre: 0}));
+
+  const parOrdre = repo.loadAll(dir).map((p) => p.id);
+  assert.deepStrictEqual(parOrdre, ['beta', 'alpha', 'zebre']);
+
+  const parOrdreSafe = repo.loadAllSafe(dir).projects.map((p) => p.id);
+  assert.deepStrictEqual(parOrdreSafe, ['beta', 'alpha', 'zebre']);
+});

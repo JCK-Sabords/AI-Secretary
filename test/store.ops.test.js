@@ -369,3 +369,92 @@ test('le statut d une tache et celui d un projet ont des domaines distincts', ()
     {op: 'update_task', ref: 'ES1', champs: {statut: 'en_pause'}}], AUJ);
   assert.strictEqual(refuseProjet.applied.length, 0, 'un statut de projet n est pas un statut de tache valide');
 });
+
+function baseMulti() {
+  return [
+    {id: 'estimmo', prefixe: 'ES', titre: 'Estimmo', domaine: 'side', statut: 'actif',
+     echeance: '', prochaine_action: '', jira: '', dernier_n: 3, ordre: 0, contexte: '',
+     taches: [
+       {n: 1, titre: 'a', statut: 'a_faire', responsable: 'moi', echeance: '',
+        nature_echeance: 'souhaitee', prio: 'P3', effort: 'M', bloque_par: '',
+        derniere_relance: '', prochaine_relance: '', maj_le: '', note_blocage: ''},
+       {n: 2, titre: 'b', statut: 'a_faire', responsable: 'moi', echeance: '',
+        nature_echeance: 'souhaitee', prio: 'P3', effort: 'M', bloque_par: '',
+        derniere_relance: '', prochaine_relance: '', maj_le: '', note_blocage: ''},
+       {n: 3, titre: 'c', statut: 'a_faire', responsable: 'moi', echeance: '',
+        nature_echeance: 'souhaitee', prio: 'P3', effort: 'M', bloque_par: '',
+        derniere_relance: '', prochaine_relance: '', maj_le: '', note_blocage: ''}
+     ]},
+    {id: 'cabinet', prefixe: 'CA', titre: 'Cabinet', domaine: 'side', statut: 'actif',
+     echeance: '', prochaine_action: '', jira: '', dernier_n: 0, ordre: 1, contexte: '', taches: []},
+    {id: 'topi', prefixe: 'TO', titre: 'Topi', domaine: 'side', statut: 'actif',
+     echeance: '', prochaine_action: '', jira: '', dernier_n: 0, ordre: 2, contexte: '', taches: []}
+  ];
+}
+
+test('reorder_projects reordonne et pose ordre selon la position', () => {
+  const r = store.applyOps(baseMulti(), [
+    {op: 'reorder_projects', ids: ['topi', 'estimmo', 'cabinet']}], AUJ);
+  assert.strictEqual(r.rejected.length, 0);
+  const parId = Object.fromEntries(r.projects.map((p) => [p.id, p.ordre]));
+  assert.strictEqual(parId.topi, 0);
+  assert.strictEqual(parId.estimmo, 1);
+  assert.strictEqual(parId.cabinet, 2);
+});
+
+test('reorder_projects est refuse si un identifiant est inconnu', () => {
+  const r = store.applyOps(baseMulti(), [
+    {op: 'reorder_projects', ids: ['estimmo', 'cabinet', 'fantome']}], AUJ);
+  assert.strictEqual(r.applied.length, 0);
+  assert.strictEqual(r.rejected.length, 1);
+});
+
+test('reorder_projects est refuse en cas de doublon', () => {
+  const r = store.applyOps(baseMulti(), [
+    {op: 'reorder_projects', ids: ['estimmo', 'estimmo', 'cabinet']}], AUJ);
+  assert.strictEqual(r.applied.length, 0);
+  assert.strictEqual(r.rejected.length, 1);
+});
+
+test('reorder_projects est refuse si un projet manque a l appel', () => {
+  const r = store.applyOps(baseMulti(), [
+    {op: 'reorder_projects', ids: ['estimmo', 'cabinet']}], AUJ);
+  assert.strictEqual(r.applied.length, 0);
+  assert.strictEqual(r.rejected.length, 1);
+});
+
+test('reorder_tasks reordonne le tableau taches sans toucher aux numeros', () => {
+  const r = store.applyOps(baseMulti(), [
+    {op: 'reorder_tasks', projet: 'estimmo', ordre: [3, 1, 2]}], AUJ);
+  assert.strictEqual(r.rejected.length, 0);
+  const p = r.projects.find((x) => x.id === 'estimmo');
+  assert.deepStrictEqual(p.taches.map((t) => t.n), [3, 1, 2]);
+  assert.strictEqual(p.dernier_n, 3, 'dernier_n reste intact');
+  assert.strictEqual(p.taches[0].titre, 'c');
+});
+
+test('reorder_tasks est refuse sur identifiant inconnu, doublon ou element manquant', () => {
+  const r1 = store.applyOps(baseMulti(), [
+    {op: 'reorder_tasks', projet: 'estimmo', ordre: [1, 2, 99]}], AUJ);
+  assert.strictEqual(r1.applied.length, 0);
+  assert.strictEqual(r1.rejected.length, 1);
+
+  const r2 = store.applyOps(baseMulti(), [
+    {op: 'reorder_tasks', projet: 'estimmo', ordre: [1, 1, 2]}], AUJ);
+  assert.strictEqual(r2.applied.length, 0);
+  assert.strictEqual(r2.rejected.length, 1);
+
+  const r3 = store.applyOps(baseMulti(), [
+    {op: 'reorder_tasks', projet: 'estimmo', ordre: [1, 2]}], AUJ);
+  assert.strictEqual(r3.applied.length, 0);
+  assert.strictEqual(r3.rejected.length, 1);
+});
+
+test('reorder_tasks et reorder_projects laissent le tableau recu intact', () => {
+  const original = baseMulti();
+  const copie = JSON.parse(JSON.stringify(original));
+  store.applyOps(original, [
+    {op: 'reorder_projects', ids: ['topi', 'cabinet', 'estimmo']},
+    {op: 'reorder_tasks', projet: 'estimmo', ordre: [3, 2, 1]}], AUJ);
+  assert.deepStrictEqual(original, copie);
+});

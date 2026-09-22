@@ -9,9 +9,20 @@ function fichiers(dir) {
   return fs.readdirSync(dir).filter((f) => f.endsWith('.md')).sort();
 }
 
+// Tri par ordre croissant puis par id a egalite, pour que les projets sans
+// ordre explicite (ou a egalite d'ordre) restent stables et previsibles.
+function trierParOrdre(projects) {
+  return projects.slice().sort((a, b) => {
+    const oa = a.ordre || 0;
+    const ob = b.ordre || 0;
+    if (oa !== ob) return oa - ob;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+}
+
 function loadAll(dir) {
-  return fichiers(dir).map(
-    (f) => store.parseProject(fs.readFileSync(path.join(dir, f), 'utf8')));
+  return trierParOrdre(fichiers(dir).map(
+    (f) => store.parseProject(fs.readFileSync(path.join(dir, f), 'utf8'))));
 }
 
 function loadAllSafe(dir) {
@@ -24,7 +35,7 @@ function loadAllSafe(dir) {
       errors.push({fichier: f, message: e.message});
     }
   });
-  return {projects, errors};
+  return {projects: trierParOrdre(projects), errors};
 }
 
 function saveProject(dir, project) {
