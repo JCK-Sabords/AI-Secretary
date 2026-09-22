@@ -303,10 +303,40 @@ Pour l'activer, ajoutez une section `exportMobile` a votre `data/config.json` (a
 ```
 
 Puis lancez `npm run exporter-mobile` (voir `outils/exporter-mobile.js`), ou planifiez-le
-toutes les heures. L'outil clone le depot de publication dans un dossier de travail temporaire
-distinct du code et des donnees, remplace `index.html`, et pousse un commit unique en force :
-l'historique du depot public ne s'accumule jamais. Sans section `exportMobile`, l'outil ne
-publie rien et le journalise dans `data/history/export.log`, sans jamais y ecrire le code.
+toutes les heures. L'outil ne clone jamais le depot de publication : il construit `index.html`
+dans un depot git flambant neuf, cree dans un dossier de travail temporaire vide, distinct du
+code et des donnees, puis pousse un commit unique en force sur ce depot ; l'historique du depot
+public ne s'accumule jamais et rien de son contenu existant n'est jamais lu ni recopie. Avant
+tout push, l'outil interroge le depot cible via `gh` et refuse de publier, sans y toucher, s'il
+contient autre chose qu'un `index.html` ou s'il correspond au depot du logiciel lui-meme : ce
+garde-fou protege contre une faute de frappe dans `exportMobile.depot`. Sans section
+`exportMobile`, l'outil ne publie rien et le journalise dans `data/history/export.log`, sans
+jamais y ecrire le code.
+
+### Changer le code d'acces
+
+Le depot de publication est public : ses anciens commits restent telechargeables par leur
+identifiant meme apres un push force qui remplace la branche. Changer le code sans recreer le
+depot laisserait donc en ligne d'anciens instantanes toujours dechiffrables avec l'ancien code.
+Procedure, a executer a la main (la suppression d'un depot GitHub n'est jamais automatisee) :
+
+1. Remplacer `exportMobile.code` dans `data/config.json` par le nouveau code.
+2. Supprimer le depot de publication :
+   ```bash
+   gh repo delete votre-compte/votre-depot-pages --yes
+   ```
+3. Le recreer, public :
+   ```bash
+   gh repo create votre-compte/votre-depot-pages --public
+   ```
+4. Reactiver GitHub Pages sur ce depot (branche `main`, dossier racine) :
+   ```bash
+   gh api -X POST repos/votre-compte/votre-depot-pages/pages -f source[branch]=main -f source[path]=/
+   ```
+5. Relancer un export :
+   ```bash
+   npm run exporter-mobile
+   ```
 
 ## Tests
 

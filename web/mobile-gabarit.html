@@ -111,7 +111,7 @@ ul{margin:0;padding:0;list-style:none}
   <section id="ecran-code">
     <p class="k">Accès protégé</p>
     <p>Saisissez le code à six chiffres pour ouvrir le tableau de bord.</p>
-    <input id="code" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
+    <input id="code" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
       autocorrect="off" autocapitalize="off" spellcheck="false" maxlength="12" placeholder="••••••">
     <button id="valider" type="button">Ouvrir</button>
     <div id="erreur">Code incorrect. Réessayez.</div>
@@ -238,6 +238,7 @@ async function tenterOuverture() {
   try {
     const clair = await dechiffrer(PAQUET, code);
     const instantane = JSON.parse(clair);
+    champ.value = '';
     afficher(instantane);
   } catch (e) {
     // Code errone ou paquet corrompu : message clair, on laisse ressaisir.

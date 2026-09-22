@@ -30,12 +30,64 @@ function journaliser(ligne) {
   const horodatage = new Date().toISOString();
   // Le code d'acces n'est jamais interpole dans les lignes journalisees par
   // cette fonction : seuls le depot, le resultat et d'eventuels messages
-  // d'erreur (jamais construits a partir du code) y figurent.
+  // d'erreur (jamais construits a partir du code, ni a partir du contenu brut
+  // de data/config.json) y figurent.
   fs.appendFileSync(JOURNAL, '[' + horodatage + '] ' + ligne + '\n', 'utf8');
 }
 
 function git(dir, args) {
   return execFileSync('git', args, {cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']});
+}
+
+// Extrait "proprietaire/depot" d'une URL de remote git, quelle que soit sa
+// forme (https://github.com/o/r.git, git@github.com:o/r.git, avec ou sans
+// suffixe .git). Retourne null si l'URL ne pointe pas vers github.com.
+function extraireProprietaireDepot(urlRemote) {
+  if (!urlRemote) return null;
+  const m = String(urlRemote).trim().match(/github\.com[/:]+([^/]+\/[^/.]+?)(\.git)?\/?$/i);
+  return m ? m[1] : null;
+}
+
+function depotsEquivalents(a, b) {
+  if (!a || !b) return false;
+  return String(a).toLowerCase() === String(b).toLowerCase();
+}
+
+// Interroge le contenu racine d'un depot GitHub via `gh`, sans jamais le
+// cloner. Retourne la liste des noms de fichiers/dossiers a la racine, ou un
+// tableau vide si le depot est vide (premier export).
+function listerFichiersDepot(depot) {
+  let info;
+  try {
+    info = JSON.parse(execFileSync('gh', ['api', 'repos/' + depot], {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}));
+  } catch (e) {
+    throw new Error('impossible d\'interroger le depot cible via gh');
+  }
+  if (!info || info.size === 0) return [];
+  const sortie = execFileSync('gh', ['api', 'repos/' + depot + '/contents/', '--jq', '[.[].name]'],
+    {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']});
+  return JSON.parse(sortie);
+}
+
+// Garde-fou avant tout push : refuse si le depot cible est le depot du
+// logiciel lui-meme, ou s'il contient deja autre chose qu'un index.html
+// (signe qu'il ne s'agit pas du depot de publication dedie). Un depot vide
+// est accepte (tout premier export). `lister` est injectable pour les tests.
+async function verifierDepotCible(depot, origineDepot, lister) {
+  if (depotsEquivalents(depot, origineDepot)) {
+    return {ok: false, raison: 'refus : le depot cible est le meme que le depot du logiciel (' + depot + ')'};
+  }
+  let fichiers;
+  try {
+    fichiers = await lister(depot);
+  } catch (e) {
+    return {ok: false, raison: 'refus : impossible de verifier le contenu du depot cible avant de publier (' + depot + ')'};
+  }
+  const autres = (fichiers || []).filter((f) => f !== 'index.html');
+  if (autres.length > 0) {
+    return {ok: false, raison: 'refus : le depot cible contient d\'autres fichiers que index.html (' + depot + ')'};
+  }
+  return {ok: true};
 }
 
 async function exporterMobile() {
@@ -51,7 +103,10 @@ async function exporterMobile() {
   try {
     data = JSON.parse(brut);
   } catch (e) {
-    const msg = 'export mobile ignore : data/config.json illisible (' + e.message + ')';
+    // Le message d'erreur de JSON.parse peut recopier un extrait du fichier
+    // fautif (et donc le code d'acces qu'il contient) : on ne le journalise
+    // jamais, meme partiellement.
+    const msg = 'export mobile ignore : data/config.json illisible';
     journaliser(msg);
     return {publie: false, raison: msg};
   }
@@ -61,6 +116,19 @@ async function exporterMobile() {
     const msg = 'export mobile ignore : section exportMobile absente ou incomplete dans data/config.json';
     journaliser(msg);
     return {publie: false, raison: msg};
+  }
+
+  let origineDepot = null;
+  try {
+    origineDepot = extraireProprietaireDepot(git(RACINE, ['remote', 'get-url', 'origin']));
+  } catch (e) {
+    origineDepot = null;
+  }
+
+  const verification = await verifierDepotCible(section.depot, origineDepot, listerFichiersDepot);
+  if (!verification.ok) {
+    journaliser(verification.raison);
+    return {publie: false, raison: verification.raison};
   }
 
   const today = aujourdhui();
@@ -82,35 +150,23 @@ async function exporterMobile() {
   }
   const page = gabarit.replace(MARQUEUR_DEBUT, '/*__PAQUET__*/' + JSON.stringify(paquet) + '/*__FIN_PAQUET__*/');
 
-  // Dossier de travail propre a l'export, distinct du depot du code (RACINE)
-  // et du depot des donnees (DATA_DIR) : un clone frais a chaque passage,
-  // supprime ensuite, pour ne jamais faire fuiter d'autre contenu.
+  // Dossier de travail propre a l'export : un depot git flambant neuf,
+  // initialise vide et ne contenant jamais que l'index.html genere. Le depot
+  // cible n'est ni clone ni lu : rien de son contenu ne peut donc se
+  // retrouver embarque dans l'index publie.
   const dossierTravail = fs.mkdtempSync(path.join(os.tmpdir(), 'secretariat-mobile-'));
   try {
     const url = 'https://github.com/' + section.depot + '.git';
-    git(dossierTravail, ['clone', '--depth', '1', url, '.']);
-    // Nouveau commit toujours sans parent (orphelin) : le clone recupere le
-    // dernier index.html publie pour permettre la comparaison de contenu
-    // ci-dessous, mais l historique de commits precedent n est jamais repris.
-    // Sans cela, un simple push --force sur une branche clonee empile un
-    // commit de plus a chaque passage (le nouveau commit garde l ancien pour
-    // parent), exactement l accumulation horaire que ce depot doit eviter.
-    const indexPrecedent = path.join(dossierTravail, 'index.html');
-    const contenuPrecedent = fs.existsSync(indexPrecedent) ? fs.readFileSync(indexPrecedent, 'utf8') : null;
-    if (contenuPrecedent === page) {
-      const msg = 'export mobile : aucun changement, rien a publier (' + section.depot + ')';
-      journaliser(msg);
-      return {publie: false, raison: msg};
-    }
-    git(dossierTravail, ['checkout', '--orphan', 'export-du-jour']);
-    fs.writeFileSync(indexPrecedent, page, 'utf8');
+    git(dossierTravail, ['init', '-q']);
+    fs.writeFileSync(path.join(dossierTravail, 'index.html'), page, 'utf8');
     git(dossierTravail, ['add', 'index.html']);
     git(dossierTravail, ['-c', 'user.email=export-mobile@local', '-c', 'user.name=Export mobile',
-      'commit', '-m', 'export : instantane chiffre du ' + today]);
+      'commit', '-q', '-m', 'export : instantane chiffre du ' + today]);
+    git(dossierTravail, ['remote', 'add', 'origin', url]);
     // Un seul commit ne doit jamais s accumuler : on ecrase la branche
     // principale distante avec ce commit unique et sans parent (push force),
     // plutot que d empiler un commit par passage horaire.
-    git(dossierTravail, ['push', '--force', 'origin', 'export-du-jour:main']);
+    git(dossierTravail, ['push', '--force', 'origin', 'HEAD:main']);
     const msg = 'export mobile publie avec succes sur ' + section.depot;
     journaliser(msg);
     return {publie: true, depot: section.depot};
@@ -137,4 +193,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = {exporterMobile};
+module.exports = {exporterMobile, verifierDepotCible, depotsEquivalents, extraireProprietaireDepot, listerFichiersDepot};
