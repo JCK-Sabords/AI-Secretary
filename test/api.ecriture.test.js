@@ -131,13 +131,16 @@ test('commit vaut true apres une ecriture reussie dans un depot Git', async () =
   assert.strictEqual(r.json.commit, true);
 });
 
-test('commit vaut false quand le contexte n est pas un depot Git alors que l ecriture a eu lieu', async () => {
+// Avant le 22 septembre 2026, un contexte sans depot Git renvoyait commit false :
+// la donnee etait ecrite mais jamais sauvegardee. C'etait precisement la panne. Le
+// depot de donnees est desormais cree au premier usage, donc toute ecriture est
+// versionnee, meme dans une installation neuve qui n'a jamais connu Git.
+test('commit vaut true meme sans depot Git prealable, le depot de donnees etant cree', async () => {
   const ctx = contexte();
   const r = await api.handle({method: 'POST', url: '/api/tache'},
     {projet: 'demo', champs: {titre: 'nouvelle'}}, ctx);
   assert.strictEqual(r.status, 200);
-  assert.strictEqual(r.json.commit, false);
-  // La donnee est bien ecrite malgre l echec du commit.
+  assert.strictEqual(r.json.commit, true, 'l ecriture doit etre sauvegardee');
   assert.strictEqual(repo.loadAll(ctx.projectsDir)[0].taches.length, 2);
 });
 

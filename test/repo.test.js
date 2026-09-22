@@ -145,41 +145,72 @@ test('saveAll ne supprime jamais rien quand idsConnus est omis', () => {
 });
 
 test('commit reussi renvoie true et cree un commit verifiable', () => {
-  const dir = depotGitTemporaire();
-  fs.mkdirSync(path.join(dir, 'data'), {recursive: true});
-  fs.writeFileSync(path.join(dir, 'data', 'fichier.txt'), 'contenu');
-  const ok = repo.commit(dir, 'ajout de fichier.txt');
+  const dataDir = tmpdir();
+  fs.writeFileSync(path.join(dataDir, 'fichier.txt'), 'contenu');
+  const ok = repo.commit(dataDir, 'ajout de fichier.txt');
   assert.strictEqual(ok, true);
-  const sujet = execFileSync('git', ['log', '-1', '--format=%s'], {cwd: dir}).toString().trim();
+  const sujet = execFileSync('git', ['log', '-1', '--format=%s'], {cwd: dataDir}).toString().trim();
   assert.strictEqual(sujet, 'ajout de fichier.txt');
-  const compte = execFileSync('git', ['rev-list', '--count', 'HEAD'], {cwd: dir}).toString().trim();
+  const compte = execFileSync('git', ['rev-list', '--count', 'HEAD'], {cwd: dataDir}).toString().trim();
   assert.strictEqual(compte, '1');
 });
 
+test('commit cree le depot de donnees au premier usage', () => {
+  const dataDir = tmpdir();
+  assert.strictEqual(fs.existsSync(path.join(dataDir, '.git')), false);
+  fs.writeFileSync(path.join(dataDir, 'projet.md'), 'x');
+  repo.commit(dataDir, 'premier commit');
+  assert.strictEqual(fs.existsSync(path.join(dataDir, '.git')), true,
+    'une installation neuve doit obtenir son depot de donnees sans rien faire');
+});
+
 test('commit sans rien a committer renvoie false sans lever', () => {
-  const dir = depotGitTemporaire();
-  const ok = repo.commit(dir, 'rien a committer');
+  const dataDir = tmpdir();
+  fs.writeFileSync(path.join(dataDir, 'fichier.txt'), 'contenu');
+  repo.commit(dataDir, 'premier');
+  const ok = repo.commit(dataDir, 'rien de neuf');
   assert.strictEqual(ok, false);
 });
 
-test('commit dans un dossier qui n est pas un depot git renvoie false sans lever', () => {
-  const dir = tmpdir();
-  const ok = repo.commit(dir, 'peu importe');
-  assert.strictEqual(ok, false);
+test('commit sur un dossier vide ne leve pas et initialise le depot', () => {
+  const dataDir = tmpdir();
+  // La creation du depot y depose un .gitignore : il y a donc bien quelque chose
+  // a commiter, et le premier commit reussit.
+  assert.doesNotThrow(() => repo.commit(dataDir, 'dossier vide'));
+  assert.strictEqual(fs.existsSync(path.join(dataDir, '.git')), true);
 });
 
-test('commit ne ramasse que le dossier data, jamais un fichier parasite a la racine', () => {
-  const dir = depotGitTemporaire();
-  fs.mkdirSync(path.join(dir, 'data'), {recursive: true});
-  fs.writeFileSync(path.join(dir, 'data', 'fichier.txt'), 'contenu de donnees');
-  fs.writeFileSync(path.join(dir, 'parasite.txt'), 'travail en cours, ne doit pas partir');
-  const ok = repo.commit(dir, 'ajout de donnees');
-  assert.strictEqual(ok, true);
-  const suivis = execFileSync('git', ['show', '--name-only', '--format=', 'HEAD'], {cwd: dir})
-    .toString().trim().split('\n');
-  assert.ok(suivis.includes('data/fichier.txt'), 'le fichier de donnees doit etre dans le commit');
-  assert.ok(!suivis.includes('parasite.txt'), 'le fichier parasite ne doit pas etre dans le commit');
-  const statut = execFileSync('git', ['status', '--porcelain'], {cwd: dir}).toString();
-  assert.match(statut, /\?\? parasite\.txt/,
-    'le fichier parasite doit rester non suivi apres le commit');
+// Regression du 22 septembre 2026. Le depot du code ignore data/, pour que les
+// donnees ne soient jamais publiees. Le commit automatique visait data/ depuis
+// la racine du code et ne ramassait donc plus rien : plus aucune modification
+// n'etait sauvegardee, sans aucun message d'erreur. Ce test reproduit exactement
+// cette configuration et exige que les donnees soient bel et bien versionnees.
+test('les donnees sont sauvegardees meme quand le depot du code ignore data/', () => {
+  const codeDir = depotGitTemporaire();
+  fs.writeFileSync(path.join(codeDir, '.gitignore'), 'data/\n');
+  const dataDir = path.join(codeDir, 'data');
+  fs.mkdirSync(path.join(dataDir, 'projects'), {recursive: true});
+  fs.writeFileSync(path.join(dataDir, 'projects', 'projet.md'), 'donnee a sauvegarder');
+
+  const ok = repo.commit(dataDir, 'modification de tache');
+  assert.strictEqual(ok, true, 'le commit de donnees doit reussir');
+
+  const suivis = execFileSync('git', ['ls-files'], {cwd: dataDir}).toString();
+  assert.match(suivis, /projects\/projet\.md/, 'la donnee doit etre versionnee dans le depot interne');
+
+  const statutCode = execFileSync('git', ['status', '--porcelain'], {cwd: codeDir}).toString();
+  assert.doesNotMatch(statutCode, /data/,
+    'le depot du code ne doit toujours rien voir de data/, sans quoi les donnees partiraient au push');
+});
+
+test('commit ne ramasse jamais un fichier situe hors du dossier de donnees', () => {
+  const racine = tmpdir();
+  const dataDir = path.join(racine, 'data');
+  fs.mkdirSync(dataDir, {recursive: true});
+  fs.writeFileSync(path.join(dataDir, 'fichier.txt'), 'donnee');
+  fs.writeFileSync(path.join(racine, 'parasite.txt'), 'travail en cours');
+  assert.strictEqual(repo.commit(dataDir, 'ajout de donnees'), true);
+  const suivis = execFileSync('git', ['ls-files'], {cwd: dataDir}).toString().trim().split('\n');
+  assert.ok(suivis.includes('fichier.txt'));
+  assert.ok(!suivis.some((f) => f.includes('parasite')), 'rien hors de data/ ne doit etre commite');
 });

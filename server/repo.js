@@ -108,16 +108,42 @@ function saveAll(dir, projects, idsConnus) {
   });
 }
 
-function commit(cwd, message) {
+// Les donnees vivent dans leur propre depot Git, a l'interieur de data/, distinct
+// du depot du code. Le depot du code est public et ignore data/ en entier : c'est
+// ce qui permet de publier le logiciel sans jamais publier les projets ni les
+// contacts de son proprietaire.
+//
+// Mais ignorer data/ dans le depot du code avait eu un effet de bord silencieux,
+// constate le 22 septembre 2026 : le commit automatique visait data/ depuis la
+// racine du code, ne ramassait donc plus rien, et plus aucune modification n'etait
+// sauvegardee. Douze projets ajoutes entre-temps n'existaient qu'en un exemplaire.
+// Le depot interne corrige cela : chaque ecriture y est commitee, localement, et
+// il est cree au premier usage pour qu'une installation neuve en beneficie aussi.
+function assurerDepot(dataDir) {
+  if (fs.existsSync(path.join(dataDir, '.git'))) return;
+  fs.mkdirSync(dataDir, {recursive: true});
+  execFileSync('git', ['init', '-q'], {cwd: dataDir, stdio: 'ignore'});
+  const ignore = path.join(dataDir, '.gitignore');
+  if (!fs.existsSync(ignore)) fs.writeFileSync(ignore, 'history/run.log*\n', 'utf8');
+  // Sans identite Git globale, git commit echoue. Dans ce seul cas, on pose une
+  // identite locale neutre, propre a ce depot de donnees.
+  let email = '';
   try {
-    // Portee volontairement restreinte au dossier data : cette fonction est
-    // appelee automatiquement apres chaque modification de tache, sans
-    // relecture humaine. Un git add -A depuis la racine embarquerait tout
-    // ce qui traine dans l arbre de travail au meme moment (code en cours
-    // d ecriture, fichiers temporaires, etc). Seul ce qui vit sous data/
-    // est legitime a etre commite ici.
-    execFileSync('git', ['add', '-A', '--', 'data'], {cwd, stdio: 'ignore'});
-    execFileSync('git', ['commit', '-q', '-m', message], {cwd, stdio: 'ignore'});
+    email = execFileSync('git', ['config', 'user.email'], {cwd: dataDir}).toString().trim();
+  } catch (e) { email = ''; }
+  if (!email) {
+    execFileSync('git', ['config', 'user.name', 'Secretariat'], {cwd: dataDir, stdio: 'ignore'});
+    execFileSync('git', ['config', 'user.email', 'secretariat@local'], {cwd: dataDir, stdio: 'ignore'});
+  }
+}
+
+function commit(dataDir, message) {
+  try {
+    assurerDepot(dataDir);
+    // Tout ce qui vit dans ce depot est de la donnee : un add complet est ici
+    // legitime, contrairement a un add depuis la racine du code.
+    execFileSync('git', ['add', '-A'], {cwd: dataDir, stdio: 'ignore'});
+    execFileSync('git', ['commit', '-q', '-m', message], {cwd: dataDir, stdio: 'ignore'});
     return true;
   } catch (e) {
     return false;

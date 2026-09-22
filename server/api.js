@@ -71,7 +71,7 @@ function appliquer(ops, ctx) {
     // supprimer. Un fichier apparu entre-temps, absent de cette liste, ne peut
     // jamais etre efface par cet appel, meme s il n est pas dans res.projects.
     repo.saveAll(ctx.projectsDir, res.projects, projects.map((p) => p.id));
-    commitOk = repo.commit(ctx.root, 'data: ' + res.applied.join(' | '));
+    commitOk = repo.commit(ctx.dataDir, 'data: ' + res.applied.join(' | '));
   }
   return {status: 200,
     json: {applied: res.applied, rejected: res.rejected, etat: etat(ctx), commit: commitOk}};
@@ -249,7 +249,7 @@ async function handle(req, body, ctx) {
     const i = gens.findIndex((g) => g.id === body.id);
     if (i >= 0) gens[i] = fiche; else gens.push(fiche);
     people.savePeople(ctx.dataDir, gens);
-    const commitOk = repo.commit(ctx.root, 'data: contact ' + body.nom + ' resolu');
+    const commitOk = repo.commit(ctx.dataDir, 'data: contact ' + body.nom + ' resolu');
     return {status: 200, json: {etat: etat(ctx), commit: commitOk}};
   }
 
