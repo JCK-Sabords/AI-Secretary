@@ -398,3 +398,27 @@ Deux consequences de ce choix, traitees dans la meme iteration :
 Les appels a `timeout` des deux scripts passent par `%SystemRoot%\System32\timeout.exe` : sous
 un terminal dont le PATH contient un autre `timeout`, celui de Git par exemple, la boucle
 d'attente du lanceur echouait instantanement et concluait a tort que le serveur ne demarrait pas.
+
+## Iteration 22 : menus deroulants immediats, volume et priorite des projets
+
+Deux ameliorations d'usage demandees apres plusieurs jours d'utilisation quotidienne.
+
+**Les listes deroulantes s'ouvrent du premier coup.** Cliquer le statut, la priorite, le
+responsable ou l'echeance d'une tache ouvrait bien l'edition en place, mais le champ etait
+seulement focalise : il fallait un second clic pour deployer la liste ou le calendrier.
+`focusInlineInput` appelle desormais `showPicker()` sur les `<select>` et les champs de date.
+Cet appel n'est autorise par le navigateur que dans le prolongement direct du clic, ce qui est
+le cas ici, et il est protege par un `try` : un navigateur qui ne connait pas `showPicker`
+retombe sur l'ancien comportement plutot que de casser l'edition.
+
+**Le volume et la priorite d'un projet se lisent ligne fermee.** Chaque ligne de projet porte
+le nombre de taches associees et une pastille P1-P4.
+
+Ce PX n'est pas une propriete du projet : c'est la plus haute priorite parmi ses taches. Il est
+donc independant de l'ordre d'affichage, qui reste celui que l'utilisateur definit a la main :
+un projet P1 peut parfaitement apparaitre apres un projet P2.
+
+Les taches faites ou abandonnees sont exclues de ce calcul. Une tache P1 terminee ne dit plus
+rien de ce qui reste a faire, et laisserait le projet affiche en P1 indefiniment. Si toutes les
+taches sont closes, aucune pastille n'est affichee. Le nombre, lui, compte bien toutes les
+taches associees, closes comprises.

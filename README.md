@@ -208,11 +208,21 @@ Toutes ecrivent dans les memes fichiers de `data/projects/` et `data/people.md`.
    en operations structurees, que le serveur valide avant de les appliquer : le modele ne peut
    jamais envoyer de message, seulement lire et ecrire des donnees.
 
+   Chaque ligne de projet affiche, sans avoir a la deplier, le nombre de taches associees et
+   une pastille de priorite P1-P4. Cette pastille n'est pas une propriete du projet : elle
+   porte la plus haute priorite parmi ses taches ouvertes. Elle est donc independante de
+   l'ordre d'affichage, que l'utilisateur definit a la main : un projet P1 peut apparaitre
+   apres un projet P2. Les taches faites ou abandonnees sont exclues du calcul, sinon une
+   tache P1 terminee maintiendrait le projet en P1 indefiniment ; quand toutes les taches
+   sont closes, aucune pastille n'est affichee. Le nombre, lui, compte toutes les taches.
+
    Sur chaque ligne de tache : une poignee (`⋮⋮`) glisser-deposer pour reordonner les taches
    d'un projet (et, de la meme facon, les projets entre eux) ; un clic sur une cellule visible
    (titre, statut, responsable, echeance) l'ouvre en edition en place, enregistree a la perte
    du focus ou a la selection dans une liste deroulante, Entree validant un champ texte et
-   Echap annulant sans rien envoyer ; un bouton crayon (« Edition complete ») ouvre le meme
+   Echap annulant sans rien envoyer. Pour les champs a choix (statut, priorite, responsable)
+   et pour l'echeance, la liste deroulante ou le calendrier se deploie des le premier clic,
+   sans avoir a cliquer une seconde fois ; un bouton crayon (« Edition complete ») ouvre le meme
    formulaire complet que pour une nouvelle tache, seul moyen de modifier l'effort et la nature
    d'echeance (`dure` ou `souhaitee`), qui n'ont pas de cellule visible dans la ligne ; un bouton
    croix (« Supprimer ») retire la tache immediatement et affiche un bandeau « Annuler » pendant

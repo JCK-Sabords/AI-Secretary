@@ -147,6 +147,12 @@ thead th{
 .pname b{font-family:var(--display);font-size:17px;font-weight:var(--display-wght);letter-spacing:var(--display-tight)}
 .dom{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .dom.pro{color:var(--accent)}
+/* Volume et priorite du projet, lisibles ligne fermee. Meme famille mono que le
+   reste des metadonnees, pour rester en retrait du titre. */
+.pmeta{display:flex;align-items:center;gap:8px;margin-top:1px}
+.pmeta .vol{font-family:var(--mono);font-size:10px;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--muted)}
+.prio.pprio{font-size:10px;text-align:left;letter-spacing:.05em}
 td.date{font-family:var(--mono);font-size:12px;white-space:nowrap;color:var(--ink-2)}
 td.date.late{color:var(--crit);font-weight:600}
 td.date.none{color:var(--muted)}
@@ -667,6 +673,41 @@ function celluleProjet(p, champ, affichageHtml, classe){
     affichageHtml + '</span>';
 }
 
+// Volume de taches et priorite d'un projet, lisibles sans le deplier.
+//
+// La priorite affichee n'est pas une propriete du projet : c'est la plus haute
+// priorite parmi ses taches, comme demande. Elle est donc independante de
+// l'ordre d'affichage, qui reste celui que l'utilisateur definit a la main : un
+// projet P1 peut parfaitement apparaitre apres un projet P2.
+//
+// Les taches faites ou abandonnees sont exclues du calcul : une tache P1
+// terminee ne dit plus rien de ce qui reste a faire, et laisserait le projet
+// affiche en P1 pour toujours. Si toutes les taches sont closes, aucune
+// priorite n'est affichee. Le nombre, lui, compte bien toutes les taches
+// associees.
+function tacheOuverte(t){ return t.statut !== 'fait' && t.statut !== 'abandonne'; }
+function prioMaxProjet(p){
+  var rang = {P1: 1, P2: 2, P3: 3, P4: 4};
+  var meilleur = '';
+  (p.taches || []).forEach(function(t){
+    if (!tacheOuverte(t)) return;
+    if (!rang[t.prio]) return;
+    if (meilleur === '' || rang[t.prio] < rang[meilleur]) meilleur = t.prio;
+  });
+  return meilleur;
+}
+function volumeHtml(p){
+  var n = (p.taches || []).length;
+  var txt = n === 0 ? 'aucune tâche' : (n + (n === 1 ? ' tâche' : ' tâches'));
+  return '<span class="vol" title="Nombre de tâches associées">' + esc(txt) + '</span>';
+}
+function prioProjetHtml(p){
+  var pm = prioMaxProjet(p);
+  if (!pm) return '';
+  return '<span class="prio pprio ' + esc(pm.toLowerCase()) +
+    '" title="Priorité la plus élevée parmi les tâches ouvertes">' + esc(pm) + '</span>';
+}
+
 function renderBoard(){
   board.innerHTML = '';
   etat.projects.filter(function(p){ return filter === 'tout' || p.domaine === filter; })
@@ -691,7 +732,8 @@ function renderBoard(){
       '<td class="handle" draggable="true" data-drag-project="' + esc(p.id) + '" title="Glisser pour réordonner">⋮⋮</td>' +
       '<td class="sev"><span class="sevbar ' + sevClass(sev) + '" title="' + esc(sevLabel(sev)) + '"></span></td>' +
       '<td><div class="pname">' + titreHtml + '<span class="dom ' + esc(domCls) + '">' +
-        (p.domaine === 'pro' ? 'Jira ' + esc(p.jira) : esc(p.prefixe) + ' · ' + esc(p.domaine)) + '</span></div></td>' +
+        (p.domaine === 'pro' ? 'Jira ' + esc(p.jira) : esc(p.prefixe) + ' · ' + esc(p.domaine)) + '</span>' +
+        '<span class="pmeta">' + prioProjetHtml(p) + volumeHtml(p) + '</span></div></td>' +
       '<td class="date ' + (late ? 'late' : (p.echeance === '' ? 'none' : '')) + '">' + echHtml + '</td>' +
       '<td class="next' + (p.prochaine_action === '' ? ' empty' : '') + '">' + nextHtml + '</td>' +
       '<td class="rowactions">' +
@@ -1535,9 +1577,23 @@ document.addEventListener('keydown', function(e){
 });
 
 /* ============================ edition en place, tache et projet (step 6) ============================ */
+// Le focus ne suffit pas pour les champs a choix : un menu deroulant focalise
+// reste ferme, et l'utilisateur devait cliquer une seconde fois pour le voir.
+// showPicker() deploie donc immediatement la liste d'un <select> ou le
+// calendrier d'un champ de date. Cet appel n'est autorise par le navigateur que
+// dans le prolongement direct du clic, ce qui est le cas ici (le gestionnaire de
+// clic appelle renderAll puis cette fonction, sans attente). Il echoue sur les
+// navigateurs qui ne connaissent pas showPicker : on retombe alors sur l'ancien
+// comportement, un simple focus, plutot que de casser l'edition.
 function focusInlineInput(){
   var el = document.getElementById('ie-champ');
-  if (el) { el.focus(); if (el.select) el.select(); }
+  if (!el) return;
+  el.focus();
+  var deroulant = el.tagName === 'SELECT' || el.type === 'date';
+  if (!deroulant) { if (el.select) el.select(); return; }
+  if (typeof el.showPicker === 'function') {
+    try { el.showPicker(); } catch (e) {}
+  }
 }
 // Echap n'envoie jamais rien : on efface simplement l'etat d'edition en place et
 // on rend a nouveau, sans passer par l'ecouteur "blur" (qui, lui, enregistre).
