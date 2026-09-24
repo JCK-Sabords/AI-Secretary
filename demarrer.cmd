@@ -1,5 +1,5 @@
 @echo off
-rem Raccourci de demarrage du Secretariat particulier (tache 15).
+rem Raccourci de demarrage du Secretariat particulier.
 rem
 rem 1. Verifie l'etat du port 5556 (sous-routine verifierEtat plus bas), qui
 rem    distingue trois cas :
@@ -9,11 +9,20 @@ rem    - un autre programme occupe ce port : n'ouvre rien, avertit et garde
 rem      la fenetre ouverte pour que l'avertissement reste lisible.
 rem 2. Si le serveur doit demarrer, attend qu'il reponde, avec un delai
 rem    maximal de 30 secondes.
-rem 3. Ouvre http://127.0.0.1:5556 dans le navigateur par defaut.
+rem 3. Ouvre http://127.0.0.1:5556 dans le navigateur par defaut, puis cette
+rem    fenetre se ferme.
 rem 4. Si le serveur ne repond jamais, affiche une erreur claire et garde
 rem    cette fenetre ouverte (pause) pour que l'erreur reste lisible.
 rem
-rem Le controle du port ne se contente plus d'une simple connexion TCP
+rem Le serveur tourne en fenetre CACHEE. Il tournait auparavant dans une
+rem fenetre reduite, qui restait dans la barre des taches tant que le serveur
+rem vivait : l'utilisateur voulait qu'aucune fenetre de commandes ne subsiste
+rem une fois le navigateur ouvert. Consequence directe de ce choix : sans
+rem fenetre, la sortie du serveur ne s'afficherait plus nulle part, donc elle
+rem est redirigee vers data\history\serveur.log, et c'est ce journal que le
+rem message d'erreur designe. Pour arreter le serveur, utiliser arreter.cmd.
+rem
+rem Le controle du port ne se contente pas d'une simple connexion TCP
 rem reussie : une connexion TCP reussie prouve seulement que quelque chose
 rem ecoute sur ce port, pas que c'est NOTRE serveur qui repond. N'importe
 rem quel autre programme occupant le port 5556 accepterait la meme connexion,
@@ -28,6 +37,7 @@ cd /d "%~dp0"
 set "PORT=5556"
 set "URL=http://127.0.0.1:%PORT%"
 set "TITRE=Secretariat particulier"
+set "JOURNAL=%~dp0data\history\serveur.log"
 
 call :verifierEtat
 if %errorlevel%==0 (
@@ -37,11 +47,12 @@ if %errorlevel%==0 (
 if %errorlevel%==2 goto occupe
 
 echo Demarrage du serveur local...
-start "%TITRE% - serveur" /min cmd /c "node server\server.js"
+if not exist "%~dp0data\history" mkdir "%~dp0data\history" >nul 2>&1
+powershell -NoProfile -Command "Start-Process -FilePath 'node' -ArgumentList 'server\server.js' -WorkingDirectory '%~dp0.' -WindowStyle Hidden -RedirectStandardOutput '%JOURNAL%' -RedirectStandardError '%JOURNAL%.err'"
 
 set /a tentatives=0
 :attendre
-timeout /t 1 /nobreak >nul
+"%SystemRoot%\System32\timeout.exe" /t 1 /nobreak >nul
 call :verifierEtat
 if %errorlevel%==0 goto ouvrir
 if %errorlevel%==2 goto occupe
@@ -68,7 +79,7 @@ exit /b 1
 echo.
 echo ERREUR : le serveur ne repond pas sur %URL% apres 30 secondes d'attente.
 echo Verifiez :
-echo  - qu'aucune erreur ne s'affiche dans la fenetre "%TITRE% - serveur" ;
+echo  - le journal du serveur : data\history\serveur.log et serveur.log.err ;
 echo  - que Node.js est bien installe (commande "node -v" dans un terminal) ;
 echo  - que le port %PORT% n'est pas deja occupe par un autre programme.
 echo.

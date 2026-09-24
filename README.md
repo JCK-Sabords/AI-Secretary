@@ -117,6 +117,15 @@ simplement le dashboard), ou un autre programme occupe le port (n'ouvre rien, av
 et garde la fenetre affichee pour que le port puisse etre libere). Si le serveur ne demarre
 jamais, une erreur claire reste affichee a l'ecran (la fenetre ne se ferme pas toute seule).
 
+Une fois le dashboard ouvert dans le navigateur, **la fenetre de commandes se ferme** et il
+n'en reste aucune : le serveur tourne en fenetre cachee. Sa sortie, qui ne s'afficherait donc
+plus nulle part, est redirigee vers `data/history/serveur.log` et `serveur.log.err` : c'est la
+qu'il faut regarder si le serveur refuse de demarrer.
+
+Comme le serveur n'a plus de fenetre a fermer, `arreter.cmd`, a la racine du depot, l'arrete.
+Il identifie le processus par le port qu'il ecoute, jamais par son nom, pour ne pas risquer
+d'arreter un autre programme Node qui tournerait en parallele.
+
 Pour creer ce raccourci sur votre poste :
 
 ```powershell

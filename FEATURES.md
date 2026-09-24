@@ -378,3 +378,23 @@ chiffrer/dechiffrer, echec propre sur mauvais code, echec sur texte altere d'un 
 non-repetition du sel/IV entre deux chiffrements, conformite des parametres PBKDF2/AES-GCM),
 aucune regression. Voir `.superpowers/sdd/task-20-report.md` pour le deroule complet de la
 publication et de la verification de bout en bout.
+
+## Iteration 21 : le lanceur ne laisse plus de fenetre ouverte
+
+Le serveur local tournait dans une fenetre reduite, qui restait dans la barre des taches tant
+qu'il vivait. Il tourne desormais en fenetre cachee, lancee par `Start-Process -WindowStyle
+Hidden` : une fois le dashboard ouvert dans le navigateur, plus aucune fenetre de commandes ne
+subsiste.
+
+Deux consequences de ce choix, traitees dans la meme iteration :
+
+- sans fenetre, la sortie du serveur ne s'afficherait plus nulle part. Elle est redirigee vers
+  `data/history/serveur.log` et `serveur.log.err`, et c'est ce journal que designe desormais le
+  message d'erreur du lanceur, a la place de la fenetre disparue ;
+- sans fenetre a fermer, il n'y avait plus aucun moyen d'arreter le serveur. `arreter.cmd`
+  comble ce manque. Il retrouve le processus par le port 5556 qu'il ecoute, et jamais par son
+  nom, pour ne pas risquer d'arreter un autre programme Node.
+
+Les appels a `timeout` des deux scripts passent par `%SystemRoot%\System32\timeout.exe` : sous
+un terminal dont le PATH contient un autre `timeout`, celui de Git par exemple, la boucle
+d'attente du lanceur echouait instantanement et concluait a tort que le serveur ne demarrait pas.
