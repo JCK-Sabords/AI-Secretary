@@ -104,6 +104,12 @@ function construirePrompt(projects, people, texte, today, proprietaire) {
         'statut, jira}}',
       '- delete_project : {op, projet}',
       '',
+      'La prochaine action d un projet n est pas a saisir : elle est deduite de ses taches ' +
+        '(la tache ouverte la plus prioritaire). Le champ prochaine_action ne sert que pour ' +
+        'un projet qui ne porte encore aucune tache. Quand on te demande de changer la ' +
+        'prochaine action d un projet qui a des taches, agis sur les taches (priorite ou ' +
+        'creation), pas sur ce champ.',
+      '',
       'Valeurs fermees a respecter strictement : statut de tache parmi a_faire, en_cours, bloque, ' +
         'fait, abandonne ; nature_echeance parmi dure, souhaitee ; prio parmi P1, P2, P3, P4 ; ' +
         'effort parmi S, M, L ; domaine de projet parmi side, perso, pro. Les dates sont au ' +

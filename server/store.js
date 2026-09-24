@@ -162,6 +162,30 @@ function openTasks(project) {
     (t) => t.statut !== 'fait' && t.statut !== 'abandonne');
 }
 
+// Prochaine action d un projet : elle n est plus saisie a la main, elle se deduit
+// des taches. C est la tache ouverte la plus prioritaire ; a priorite egale, la
+// premiere dans la liste du projet, c est-a-dire celle que l utilisateur a placee
+// en tete par glisser-deposer. L ordre de la liste est donc le seul departage, et
+// il lui appartient entierement.
+//
+// Renvoie la tache elle-meme, ou null si le projet n a aucune tache ouverte. Dans
+// ce dernier cas seulement, le champ texte `prochaine_action` du fichier garde son
+// role : il reste la seule facon de dire ce qu il faut faire sur un projet qui ne
+// porte pas encore de tache.
+const RANG_PRIO = {P1: 1, P2: 2, P3: 3, P4: 4};
+function prochaineAction(project) {
+  const ouvertes = openTasks(project);
+  if (ouvertes.length === 0) return null;
+  let meilleure = null;
+  ouvertes.forEach((t) => {
+    const rang = RANG_PRIO[t.prio] || 99;
+    // Comparaison stricte : a egalite on ne remplace pas, donc la premiere
+    // rencontree dans l ordre de la liste l emporte.
+    if (meilleure === null || rang < (RANG_PRIO[meilleure.prio] || 99)) meilleure = t;
+  });
+  return meilleure;
+}
+
 function signals(project, today) {
   const ouvertes = openTasks(project);
   return {
@@ -171,7 +195,10 @@ function signals(project, today) {
     echeanceProche: !!project.echeance &&
       daysBetween(project.echeance, today) >= 0 &&
       daysBetween(project.echeance, today) < 14,
-    sansProchaineAction: !project.prochaine_action,
+    // Un projet qui porte des taches ouvertes a toujours une prochaine action,
+    // puisqu elle en est deduite : le signal ne peut plus se declencher que sur
+    // un projet sans tache ouverte dont le champ texte est vide lui aussi.
+    sansProchaineAction: !prochaineAction(project) && !project.prochaine_action,
     dormant: ouvertes.length > 0 &&
       ouvertes.every((t) => !!t.maj_le && daysBetween(t.maj_le, today) < -30),
     wipEleve: ouvertes.filter((t) => t.statut === 'en_cours').length >= 3,
@@ -396,5 +423,5 @@ function applyOps(projects, ops, today) {
 module.exports = {InvalidProjectError, parseProject, serializeProject,
   TASK_FIELDS, TASK_DEFAULTS, PROJECT_DEFAULTS,
   refOf, parseRef, findByRef, nextTaskNumber, allocatePrefix,
-  daysBetween, addDays, openTasks, signals, severity,
+  daysBetween, addDays, openTasks, prochaineAction, signals, severity,
   applyOps, DOMAINES, DOMAINES_PROJET, idValide};

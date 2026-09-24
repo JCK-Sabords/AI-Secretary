@@ -43,6 +43,10 @@ function construireInstantane(dataDir, today) {
       statut: p.statut,
       echeance: p.echeance,
       prochaine_action: p.prochaine_action,
+      prochaine_action_auto: (function () {
+        const t = store.prochaineAction(p);
+        return t === null ? null : {ref: store.refOf(p, t), titre: t.titre, prio: t.prio};
+      })(),
       severite,
       signaux,
       taches: store.openTasks(p).map((t) => ({

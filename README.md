@@ -208,6 +208,12 @@ Toutes ecrivent dans les memes fichiers de `data/projects/` et `data/people.md`.
    en operations structurees, que le serveur valide avant de les appliquer : le modele ne peut
    jamais envoyer de message, seulement lire et ecrire des donnees.
 
+   La prochaine action d'un projet ne se saisit pas : c'est la tache ouverte la plus
+   prioritaire, a priorite egale la premiere de la liste, donc celle placee en tete par
+   glisser-deposer. La cellule affiche la reference de la tache puis son intitule et n'est pas
+   editable. Le champ texte `prochaine_action` du fichier ne reprend la main que sur un projet
+   sans tache ouverte, seul cas ou il reste editable et ou le tiroir de projet l'utilise.
+
    Chaque ligne de projet affiche, sans avoir a la deplier, le nombre de taches associees et
    une pastille de priorite P1-P4. Cette pastille n'est pas une propriete du projet : elle
    porte la plus haute priorite parmi ses taches ouvertes. Elle est donc independante de

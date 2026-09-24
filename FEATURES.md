@@ -422,3 +422,31 @@ Les taches faites ou abandonnees sont exclues de ce calcul. Une tache P1 termine
 rien de ce qui reste a faire, et laisserait le projet affiche en P1 indefiniment. Si toutes les
 taches sont closes, aucune pastille n'est affichee. Le nombre, lui, compte bien toutes les
 taches associees, closes comprises.
+
+## Iteration 23 : la prochaine action d'un projet se deduit de ses taches
+
+La prochaine action etait une phrase libre a tenir a jour a la main, en double de taches qui
+disaient deja la meme chose. Elle est desormais calculee : c'est la tache ouverte la plus
+prioritaire du projet. A priorite egale, c'est la premiere de la liste, donc celle que
+l'utilisateur a placee en tete par glisser-deposer : l'ordre de la liste est le seul departage,
+et il lui appartient entierement.
+
+`store.prochaineAction(project)` renvoie cette tache, ou `null` si le projet n'a aucune tache
+ouverte. `GET /api/etat` et l'export mobile la calculent une seule fois et la publient sous
+`prochaine_action_auto` (`{ref, titre, prio}`), pour que le tableau de bord, la page mobile et
+l'agent hebdomadaire lisent tous la meme valeur au lieu de la recalculer chacun de son cote.
+
+Dans le tableau de bord, la cellule affiche la reference de la tache puis son intitule, et
+n'est plus editable : la valeur ne se saisit pas. Le champ texte `prochaine_action` du fichier
+n'est pas supprime pour autant, il reprend la main sur un projet sans tache ouverte, seul cas
+ou il reste editable. C'est la seule facon de dire ce qu'il faut faire sur un projet qui ne
+porte pas encore de tache, et sept des treize projets sont dans ce cas.
+
+Deux consequences traitees dans la meme iteration :
+
+- le signal « sans prochaine action » ne peut plus se declencher sur un projet qui porte une
+  tache ouverte, puisqu'il en a alors toujours une par construction. Il ne subsiste que pour un
+  projet sans tache ouverte dont le champ texte est vide ;
+- le prompt de dictee precise que ce champ ne se saisit plus : une demande de changement de
+  prochaine action sur un projet qui a des taches doit agir sur les taches (priorite ou
+  creation), jamais sur le champ.

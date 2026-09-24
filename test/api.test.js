@@ -27,7 +27,12 @@ test('GET /api/etat renvoie les projets enrichis', async () => {
   assert.strictEqual(r.status, 200);
   assert.strictEqual(r.json.projects.length, 1);
   assert.strictEqual(r.json.projects[0].severite, 'warn');
-  assert.strictEqual(r.json.projects[0].signaux.sansProchaineAction, true);
+  // La prochaine action est deduite des taches, elle n est plus saisie : le
+  // projet porte une seule tache ouverte, c est donc elle, et le signal
+  // sansProchaineAction ne peut pas se declencher.
+  assert.strictEqual(r.json.projects[0].signaux.sansProchaineAction, false);
+  assert.deepStrictEqual(r.json.projects[0].prochaine_action_auto,
+    {ref: 'DE1', titre: 'a', prio: 'P3'});
   assert.strictEqual(r.json.today, '2026-09-06');
 });
 

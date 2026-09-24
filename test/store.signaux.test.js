@@ -65,9 +65,46 @@ test('signal 2 : echeance a moins de 14 jours', () => {
     taches: [tache({})]}), AUJ).echeanceProche, false);
 });
 
-test('signal 3 : prochaine action vide', () => {
+// La prochaine action se deduit desormais des taches : un projet qui en porte une
+// ouverte en a toujours une, quel que soit le champ texte. Le signal ne subsiste
+// donc que pour un projet sans tache ouverte dont le champ texte est vide.
+test('signal 3 : sans prochaine action seulement si aucune tache ouverte et champ vide', () => {
   assert.strictEqual(store.signals(projet({prochaine_action: '',
-    taches: [tache({})]}), AUJ).sansProchaineAction, true);
+    taches: [tache({})]}), AUJ).sansProchaineAction, false);
+  assert.strictEqual(store.signals(projet({prochaine_action: '',
+    taches: [tache({statut: 'fait'})]}), AUJ).sansProchaineAction, true);
+  assert.strictEqual(store.signals(projet({prochaine_action: 'faire un truc',
+    taches: [tache({statut: 'fait'})]}), AUJ).sansProchaineAction, false);
+});
+
+test('prochaineAction : la tache ouverte la plus prioritaire', () => {
+  const p = projet({taches: [
+    tache({n: 1, titre: 'basse', prio: 'P3'}),
+    tache({n: 2, titre: 'haute', prio: 'P1'}),
+    tache({n: 3, titre: 'moyenne', prio: 'P2'})]});
+  assert.strictEqual(store.prochaineAction(p).n, 2);
+});
+
+test('prochaineAction : a priorite egale, la premiere de la liste', () => {
+  const p = projet({taches: [
+    tache({n: 1, titre: 'basse', prio: 'P3'}),
+    tache({n: 2, titre: 'premiere P1', prio: 'P1'}),
+    tache({n: 3, titre: 'seconde P1', prio: 'P1'})]});
+  assert.strictEqual(store.prochaineAction(p).n, 2);
+});
+
+test('prochaineAction : ignore les taches faites ou abandonnees', () => {
+  const p = projet({taches: [
+    tache({n: 1, titre: 'terminee', prio: 'P1', statut: 'fait'}),
+    tache({n: 2, titre: 'laissee', prio: 'P1', statut: 'abandonne'}),
+    tache({n: 3, titre: 'reste', prio: 'P4'})]});
+  assert.strictEqual(store.prochaineAction(p).n, 3);
+});
+
+test('prochaineAction : null quand aucune tache ouverte', () => {
+  assert.strictEqual(store.prochaineAction(projet({taches: []})), null);
+  assert.strictEqual(
+    store.prochaineAction(projet({taches: [tache({statut: 'fait'})]})), null);
 });
 
 test('signal 4 : dormant si toutes les taches ouvertes depassent 30 jours', () => {
@@ -100,8 +137,10 @@ test('severity crit prime sur warn', () => {
 });
 
 test('severity warn sur un signal secondaire seul', () => {
+  // sansProchaineAction ne peut plus servir de signal secondaire sur un projet
+  // qui porte une tache ouverte : on passe par dormant, qui reste dans ce cas.
   assert.strictEqual(store.severity(projet({prochaine_action: '',
-    taches: [tache({})]}), AUJ), 'warn');
+    taches: [tache({maj_le: '2026-07-01'})]}), AUJ), 'warn');
 });
 
 test('severity ok quand aucun signal', () => {

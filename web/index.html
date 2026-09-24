@@ -158,6 +158,10 @@ td.date.late{color:var(--crit);font-weight:600}
 td.date.none{color:var(--muted)}
 .next{color:var(--ink-2);max-width:320px}
 .next.empty{color:var(--crit)}
+/* Prochaine action deduite : pas de curseur d'edition, la valeur ne se saisit
+   pas. La reference de la tache precede l'intitule. */
+.next .cell.auto{cursor:default}
+.next .cell.auto .ref{margin-right:8px}
 .chev{font-family:var(--mono);color:var(--muted);width:20px;text-align:center}
 .prow[aria-expanded="true"]{background:var(--surface-2)}
 .prow[aria-expanded="true"] .chev{color:var(--accent)}
@@ -720,8 +724,18 @@ function renderBoard(){
     var titreHtml = celluleProjet(p, 'titre', '<b>' + esc(p.titre) + '</b>');
     var echHtml = celluleProjet(p, 'echeance',
       p.echeance === '' ? 'sans date' : frDate(p.echeance));
-    var nextHtml = celluleProjet(p, 'prochaine_action',
-      p.prochaine_action === '' ? 'aucune prochaine action définie' : esc(p.prochaine_action));
+    // La prochaine action n'est plus saisie a la main des lors que le projet
+    // porte des taches : le serveur la deduit (la tache ouverte la plus
+    // prioritaire, voir store.prochaineAction) et la cellule devient un simple
+    // affichage, non editable, qui rappelle la reference de la tache. Le champ
+    // texte du fichier ne reprend la main que sur un projet sans tache ouverte,
+    // seul cas ou il reste editable.
+    var auto = p.prochaine_action_auto;
+    var nextHtml = auto
+      ? '<span class="cell auto" title="Tâche ouverte la plus prioritaire, déduite automatiquement">' +
+          '<span class="ref">' + esc(auto.ref) + '</span>' + esc(auto.titre) + '</span>'
+      : celluleProjet(p, 'prochaine_action',
+          p.prochaine_action === '' ? 'aucune prochaine action définie' : esc(p.prochaine_action));
 
     var tr = document.createElement('tr');
     tr.className = 'prow';
@@ -735,7 +749,7 @@ function renderBoard(){
         (p.domaine === 'pro' ? 'Jira ' + esc(p.jira) : esc(p.prefixe) + ' · ' + esc(p.domaine)) + '</span>' +
         '<span class="pmeta">' + prioProjetHtml(p) + volumeHtml(p) + '</span></div></td>' +
       '<td class="date ' + (late ? 'late' : (p.echeance === '' ? 'none' : '')) + '">' + echHtml + '</td>' +
-      '<td class="next' + (p.prochaine_action === '' ? ' empty' : '') + '">' + nextHtml + '</td>' +
+      '<td class="next' + (!auto && p.prochaine_action === '' ? ' empty' : '') + '">' + nextHtml + '</td>' +
       '<td class="rowactions">' +
         '<button class="addtask-btn" type="button" data-quickadd="' + esc(p.id) + '" title="Ajouter une tâche">+</button>' +
         '<button class="iconbtn round" type="button" data-edit-project="' + esc(p.id) + '" title="Modifier le projet">✎</button>' +
@@ -1137,7 +1151,9 @@ function projectDrawerHtml(p){
         '<div class="f"><label class="k" for="pd-ech">Échéance</label>' +
           '<input type="date" id="pd-ech" value="' + esc(v.echeance) + '"></div>' +
         '<div class="f"><label class="k" for="pd-next">Prochaine action</label>' +
-          '<input type="text" id="pd-next" value="' + esc(v.prochaine_action) + '" placeholder="Vide si aucune"></div>' +
+          '<input type="text" id="pd-next" value="' + esc(v.prochaine_action) + '" placeholder="Vide si aucune">' +
+          '<span class="hint">Utilisée uniquement tant que le projet n\'a aucune tâche ouverte. ' +
+          'Dès qu\'il en porte une, la prochaine action devient sa tâche la plus prioritaire.</span></div>' +
         // Meme correctif que relanceHidden ci-dessus (editorHtml) : hidden seul est
         // inoperant ici, .f{display:flex} l'emporte sur la regle navigateur.
         '<div class="f" id="pd-jira-row"' +

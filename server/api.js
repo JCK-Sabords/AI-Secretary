@@ -14,6 +14,14 @@ function aujourdhui() {
   return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
 }
 
+// Forme affichable de la prochaine action deduite : la reference de la tache et
+// son intitule, ou null si le projet n a aucune tache ouverte, auquel cas c est le
+// champ texte `prochaine_action` du fichier qui prend le relais.
+function prochaineActionAuto(p) {
+  const t = store.prochaineAction(p);
+  return t === null ? null : {ref: store.refOf(p, t), titre: t.titre, prio: t.prio};
+}
+
 function etat(ctx) {
   const today = ctx.today || aujourdhui();
   const {projects, errors} = repo.loadAllSafe(ctx.projectsDir);
@@ -33,7 +41,12 @@ function etat(ctx) {
     try {
       projetsEnrichis.push(Object.assign({}, p, {
         severite: store.severity(p, today),
-        signaux: store.signals(p, today)
+        signaux: store.signals(p, today),
+        // Prochaine action deduite des taches (voir store.prochaineAction). Elle
+        // est calculee ici, une seule fois, pour que le tableau de bord, l export
+        // mobile et l agent hebdomadaire lisent tous la meme valeur plutot que de
+        // la recalculer chacun de son cote.
+        prochaine_action_auto: prochaineActionAuto(p)
       }));
     } catch (e) {
       errorsCalcul.push({fichier: p.id + '.md', message:
