@@ -7,6 +7,8 @@ const beeper = require('./beeper');
 const people = require('./people');
 const dictee = require('./dictee');
 const sante = require('./sante');
+const lancement = require('./lancement');
+const devinerProjet = require('./deviner-projet');
 
 function aujourdhui() {
   const d = new Date();
@@ -174,6 +176,54 @@ async function handle(req, body, ctx) {
   if (req.method === 'DELETE' && url === '/api/tache') {
     if (!body || !body.ref) return {status: 400, json: {erreur: 'reference manquante'}};
     return appliquer([{op: 'delete_task', ref: body.ref}], ctx);
+  }
+
+  // Rapprochement avec la liste de taches WhatsApp, au lancement du tableau de
+  // bord. Lecture seule : cette route ne retire et n'ajoute jamais rien, elle
+  // dit seulement ce qu'il y aurait a faire. Les ecritures qui en decoulent
+  // passent par /api/ops et /api/tache, apres un geste explicite dans la
+  // fenetre de confirmation.
+  if (req.method === 'GET' && url === '/api/lancement') {
+    try {
+      return {status: 200, json: await lancement.analyser(ctx)};
+    } catch (e) {
+      // Aucune panne de ce rapprochement ne doit empecher l'ouverture du
+      // tableau de bord : l'interface recevra simplement un etat inactif.
+      return {status: 200, json: {actif: false, raison: 'erreur', message: e.message}};
+    }
+  }
+
+  // Devine le projet de rattachement de lignes encore inconnues. Separee de
+  // /api/lancement parce qu'elle appelle Claude : la premiere fenetre, celle des
+  // suppressions, ne doit pas attendre un modele de langage pour s'afficher.
+  if (req.method === 'POST' && url === '/api/lancement/deviner') {
+    if (!body || !Array.isArray(body.lignes)) {
+      return {status: 400, json: {erreur: 'corps attendu : {lignes: []}'}};
+    }
+    const lignes = body.lignes
+      .filter((l) => typeof l === 'string' && l.trim() !== '')
+      .slice(0, devinerProjet.LIMITE_LIGNES);
+    const {projects} = repo.loadAllSafe(ctx.projectsDir);
+    const projets = projects.map((p) => ({id: p.id, titre: p.titre, domaine: p.domaine}));
+    const propositions = await devinerProjet.deviner(
+      lignes, projets, ctx && ctx.lancerClaude);
+    return {status: 200, json: {propositions, projets}};
+  }
+
+  // Marque le message de liste comme traite, quelle que soit la reponse du
+  // proprietaire. C'est ce qui fait qu'un « Retablir » n'est pas defait par la
+  // prochaine ouverture, et que des lignes volontairement laissees de cote ne
+  // reviennent pas a chaque fois.
+  if (req.method === 'POST' && url === '/api/lancement/cloturer') {
+    if (!body || typeof body.messageId !== 'string' || body.messageId.trim() === '') {
+      return {status: 400, json: {erreur: 'corps attendu : {messageId: "..."}'}};
+    }
+    try {
+      lancement.ecrireEtat(ctx.dataDir, body.messageId);
+      return {status: 200, json: {ok: true}};
+    } catch (e) {
+      return {status: 500, json: {erreur: 'etat du rapprochement non enregistre'}};
+    }
   }
 
   if (req.method === 'GET' && url === '/api/comptes') {

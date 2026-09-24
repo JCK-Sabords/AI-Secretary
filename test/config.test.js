@@ -12,7 +12,7 @@ function tmpdata() {
 
 test('lireConfig renvoie des valeurs de repli quand le fichier config.json est absent', () => {
   const r = config.lireConfig(tmpdata());
-  assert.deepStrictEqual(r, {proprietaire: "l'utilisateur", filNoteASoiMeme: ''});
+  assert.deepStrictEqual(r, {proprietaire: "l'utilisateur", filNoteASoiMeme: '', filTachesWhatsApp: ''});
 });
 
 test('lireConfig renvoie des valeurs de repli sans lever quand le JSON est casse', () => {
@@ -20,7 +20,7 @@ test('lireConfig renvoie des valeurs de repli sans lever quand le JSON est casse
   fs.writeFileSync(path.join(d, 'config.json'), '{ceci n est pas du JSON', 'utf8');
   assert.doesNotThrow(() => config.lireConfig(d));
   const r = config.lireConfig(d);
-  assert.deepStrictEqual(r, {proprietaire: "l'utilisateur", filNoteASoiMeme: ''});
+  assert.deepStrictEqual(r, {proprietaire: "l'utilisateur", filNoteASoiMeme: '', filTachesWhatsApp: ''});
 });
 
 test('lireConfig complete une cle proprietaire manquante par la valeur de repli', () => {
@@ -41,18 +41,18 @@ test('lireConfig complete une cle filNoteASoiMeme manquante par une chaine vide'
   assert.strictEqual(r.filNoteASoiMeme, '');
 });
 
-test('lireConfig renvoie les deux cles telles quelles quand le fichier est complet', () => {
+test('lireConfig renvoie les cles telles quelles quand le fichier est complet', () => {
   const d = tmpdata();
   fs.writeFileSync(path.join(d, 'config.json'),
-    JSON.stringify({proprietaire: 'Alex', filNoteASoiMeme: '!fil:beeper.com'}), 'utf8');
+    JSON.stringify({proprietaire: 'Alex', filNoteASoiMeme: '!fil:beeper.com', filTachesWhatsApp: ''}), 'utf8');
   const r = config.lireConfig(d);
-  assert.deepStrictEqual(r, {proprietaire: 'Alex', filNoteASoiMeme: '!fil:beeper.com'});
+  assert.deepStrictEqual(r, {proprietaire: 'Alex', filNoteASoiMeme: '!fil:beeper.com', filTachesWhatsApp: ''});
 });
 
 test('lireConfig ne leve jamais, meme sur un dossier inexistant', () => {
   const d = path.join(os.tmpdir(), 'secretaire-config-inexistant-' + Date.now());
   assert.doesNotThrow(() => config.lireConfig(d));
-  assert.deepStrictEqual(config.lireConfig(d), {proprietaire: "l'utilisateur", filNoteASoiMeme: ''});
+  assert.deepStrictEqual(config.lireConfig(d), {proprietaire: "l'utilisateur", filNoteASoiMeme: '', filTachesWhatsApp: ''});
 });
 
 /* ============================ substituerProprietaire ============================ */

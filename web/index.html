@@ -254,6 +254,28 @@ input[type="date"]{font-family:var(--mono);font-size:12px}
   letter-spacing:var(--display-tight)}
 .drawer .body{padding:18px 20px;display:flex;flex-direction:column;gap:16px;overflow-y:auto;flex:1}
 .drawer > footer{padding:16px 20px;border-top:1px solid var(--rule);display:flex;gap:10px;justify-content:flex-end}
+
+/* ---------- fenetre de rapprochement avec la liste WhatsApp ---------- */
+.modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:min(620px,calc(100% - 32px));max-height:min(80vh,720px);background:var(--surface);
+  border:2px solid var(--ink);z-index:41;display:flex;flex-direction:column}
+.modal > header{padding:18px 20px;border-bottom:1px solid var(--rule)}
+.modal h3{margin:0 0 5px;font-family:var(--display);font-size:20px;
+  font-weight:var(--display-wght);letter-spacing:var(--display-tight)}
+.modal .body{padding:16px 20px;overflow-y:auto;flex:1}
+.modal > footer{padding:16px 20px;border-top:1px solid var(--rule);display:flex;
+  gap:10px;justify-content:flex-end;align-items:center}
+.modal > footer .pousse{margin-right:auto;font-size:12px;color:var(--muted)}
+.rapp{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.rapp li{display:flex;gap:10px;align-items:center;padding:10px 0;
+  border-bottom:1px solid var(--rule-soft)}
+.rapp li:last-child{border-bottom:0}
+.rapp .lib{flex:1;min-width:0}
+.rapp .lib b{font-weight:600}
+.rapp .meta{display:block;font-family:var(--mono);font-size:10px;
+  letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-top:2px}
+.rapp select{max-width:190px}
+.rapp .fait{color:var(--ok);font-family:var(--mono);font-size:11px}
 textarea{font-family:var(--body);font-size:14px;line-height:1.55;color:var(--ink);background:var(--sunken);
   border:1px solid var(--rule);padding:12px;min-height:180px;resize:vertical;width:100%}
 .route{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7}
@@ -393,6 +415,7 @@ footer.legalese{margin-top:40px;padding-top:16px;border-top:1px solid var(--rule
 </section>
 
 <div id="drawerHost"></div>
+<div id="modalHost"></div>
 <div id="toastHost"></div>
 <div id="undoHost"></div>
 
@@ -1968,11 +1991,17 @@ async function verifierClaude(){
 // Controle Claude a l'ouverture : l'utilisateur a demande un aller-retour reel a
 // chaque fois, pas seulement au clic. Le controle gratuit sert de preambule
 // rapide, le vrai appel tranche.
+// Promesse resolue quand le controle d'ouverture est termine, avec l'etat final
+// de la pastille Claude. Le rapprochement avec la liste WhatsApp l'attend avant
+// d'ouvrir sa deuxieme fenetre : c'est Claude qui devine le projet de
+// rattachement, la proposer avant qu'il soit joignable n'aurait aucun sens.
+var claudeBranche = null;
 async function controlerClaudeAuChargement(){
   voyantClaudeEl.disabled = true;
   var prealableOk = await verifierClaude();
-  if (!prealableOk) { voyantClaudeEl.disabled = false; return; }
+  if (!prealableOk) { voyantClaudeEl.disabled = false; return false; }
   await testerClaudeReel();
+  return voyantClaudeEl.classList.contains('ok');
 }
 
 // Vrai aller-retour, declenche par un clic sur la pastille Claude : la
@@ -2033,7 +2062,7 @@ voyantClaudeEl.addEventListener('click', testerClaudeReel);
 
 verifierBeeper();
 demarrerSurveillanceBeeper();
-controlerClaudeAuChargement();
+claudeBranche = controlerClaudeAuChargement();
 
 /* ============================ glisser-deposer par une poignee (step 4) ============================
    Glisser-depose natif du navigateur, sans bibliotheque : seule la poignee porte
@@ -2135,5 +2164,221 @@ agentInputEl.addEventListener('keydown', function(e){
   }
 });
 
-charger();
+
+/* ============================ rapprochement avec la liste WhatsApp ============================
+   A chaque ouverture, le serveur compare la derniere liste de taches envoyee dans
+   la conversation WhatsApp a soi-meme avec la precedente, et avec le portefeuille.
+   Deux fenetres s'enchainent, jamais en meme temps :
+
+   1. les taches disparues d'un message au suivant, donc faites. « OK » les retire
+      du secretariat, « Retablir » les garde. Rien n'est retire avant ce geste :
+      la suppression n'est envoyee qu'au clic sur OK. Ce choix n'est pas cosmetique.
+      Les numeros de tache ne sont jamais reattribues (voir CLAUDE.md), donc une
+      tache supprimee puis recreee reviendrait sous une autre reference : ES2
+      deviendrait ES7. Differer l'ecriture est le seul moyen de garantir que
+      « Retablir » rende exactement l'etat d'avant.
+
+   2. les lignes de la liste qui n'existent pas encore dans le portefeuille, avec
+      le projet devine par Claude, modifiable, et un bouton + pour l'ajouter.
+      Fermer la fenetre laisse de cote les lignes restantes, comme demande.
+
+   Dans les deux cas, le message traite est marque comme tel a la fin, pour qu'une
+   reponse donnee ne soit pas redemandee a la prochaine ouverture.
+*/
+var modalHost = document.getElementById('modalHost');
+var rapprochement = null;
+
+function fermerModale(){
+  modalHost.innerHTML = '';
+}
+
+// Marque le message comme traite. Appele une seule fois, a la fin de
+// l'enchainement, quelle qu'ait ete la reponse.
+async function cloturerRapprochement(){
+  if (!rapprochement) return;
+  var id = rapprochement.messageId;
+  rapprochement = null;
+  try {
+    await fetch('/api/lancement/cloturer', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({messageId: id})
+    });
+  } catch (e) {
+    // Sans cloture, la meme proposition reviendra a la prochaine ouverture.
+    // Penible, mais sans danger : rien n'est perdu, et l'utilisateur pourra
+    // repondre de nouveau. On ne l'interrompt donc pas avec une erreur.
+  }
+}
+
+function modaleHtml(titre, sousTitre, corps, pied){
+  return '<div class="scrim" data-rapp-scrim></div>' +
+    '<section class="modal" role="dialog" aria-modal="true" aria-label="' + esc(titre) + '">' +
+      '<header><h3>' + esc(titre) + '</h3>' +
+        '<span class="hint">' + sousTitre + '</span></header>' +
+      '<div class="body">' + corps + '</div>' +
+      '<footer>' + pied + '</footer>' +
+    '</section>';
+}
+
+/* ---------- fenetre 1 : les taches faites ---------- */
+function afficherRetraits(){
+  var items = rapprochement.aRetirer;
+  var corps = '<ul class="rapp">' + items.map(function(x){
+    return '<li><span class="lib"><b>' + esc(x.titre) + '</b>' +
+      '<span class="meta">' + esc(x.ref) + ' · ' + esc(x.projet) + '</span></span></li>';
+  }).join('') + '</ul>';
+  var pied =
+    '<span class="pousse">' + items.length +
+      (items.length === 1 ? ' tâche' : ' tâches') + '</span>' +
+    '<button class="btn" type="button" data-rapp-retablir>Rétablir</button>' +
+    '<button class="btn primary" type="button" data-rapp-ok>OK</button>';
+  modalHost.innerHTML = modaleHtml(
+    'Tâches faites',
+    'Ces tâches ont disparu de ta liste WhatsApp depuis le message précédent. ' +
+      'OK les retire du secrétariat, Rétablir les garde.',
+    corps, pied);
+}
+
+async function validerRetraits(){
+  var refs = rapprochement.aRetirer.map(function(x){ return x.ref; });
+  fermerModale();
+  if (refs.length) {
+    await envoyerOps(refs.map(function(ref){ return {op: 'delete_task', ref: ref}; }));
+    toast(refs.length + (refs.length === 1 ? ' tâche retirée' : ' tâches retirées'));
+  }
+  await etapeAjouts();
+}
+
+async function annulerRetraits(){
+  fermerModale();
+  toast('Tâches conservées.');
+  await etapeAjouts();
+}
+
+/* ---------- fenetre 2 : les taches a creer ---------- */
+// Elle attend que Claude soit joignable, comme demande : c'est lui qui devine le
+// projet de rattachement, que la note WhatsApp ne mentionne jamais. Si Claude ne
+// repond pas, les lignes sont tout de meme proposees, sans projet pre-selectionne.
+async function etapeAjouts(){
+  if (!rapprochement || !rapprochement.aAjouter.length) { await cloturerRapprochement(); return; }
+  var lignes = rapprochement.aAjouter.map(function(x){ return x.ligne; });
+
+  // On attend la fin du controle d'ouverture de Claude. Son resultat n'est pas
+  // bloquant : s'il est injoignable, les lignes sont tout de meme proposees,
+  // simplement sans projet devine. Perdre la suggestion est acceptable, perdre
+  // les lignes ne l'est pas.
+  try { await claudeBranche; } catch (e) { /* controle en echec, on continue */ }
+
+  var data;
+  try {
+    var r = await fetch('/api/lancement/deviner', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({lignes: lignes})
+    });
+    data = await r.json();
+  } catch (e) {
+    data = null;
+  }
+  var propositions = (data && data.propositions) || lignes.map(function(l){
+    return {ligne: l, projetPropose: ''};
+  });
+  afficherAjouts(propositions, rapprochement.projets);
+}
+
+function optionsProjets(projets, choisi){
+  return '<option value="">Choisir un projet</option>' + projets.map(function(p){
+    return '<option value="' + esc(p.id) + '"' + (p.id === choisi ? ' selected' : '') + '>' +
+      esc(p.titre) + '</option>';
+  }).join('');
+}
+
+function afficherAjouts(propositions, projets){
+  var corps = '<ul class="rapp">' + propositions.map(function(x, i){
+    return '<li data-rapp-ligne="' + i + '">' +
+      '<span class="lib"><b>' + esc(x.ligne) + '</b></span>' +
+      '<select data-rapp-projet="' + i + '">' +
+        optionsProjets(projets, x.projetPropose) + '</select>' +
+      '<button class="iconbtn round" type="button" data-rapp-ajouter="' + i +
+        '" title="Ajouter cette tâche au projet">+</button>' +
+    '</li>';
+  }).join('') + '</ul>';
+  var pied =
+    '<span class="pousse">Les lignes laissées ici ne seront pas ajoutées.</span>' +
+    '<button class="btn primary" type="button" data-rapp-fermer>Fermer</button>';
+  modalHost.innerHTML = modaleHtml(
+    'Tâches absentes du secrétariat',
+    'Ces lignes de ta liste WhatsApp ne correspondent à aucune tâche ouverte. ' +
+      'Le projet est deviné, corrige-le si besoin, puis ajoute.',
+    corps, pied);
+  modalHost.setAttribute('data-lignes', JSON.stringify(
+    propositions.map(function(x){ return x.ligne; })));
+}
+
+async function ajouterLigne(index){
+  var li = modalHost.querySelector('[data-rapp-ligne="' + index + '"]');
+  if (!li) return;
+  var select = li.querySelector('[data-rapp-projet]');
+  var projet = select ? select.value : '';
+  if (!projet) { toast('Choisis un projet pour cette tâche.'); if (select) select.focus(); return; }
+  var lignes = JSON.parse(modalHost.getAttribute('data-lignes') || '[]');
+  var titre = lignes[index];
+  if (!titre) return;
+
+  var bouton = li.querySelector('[data-rapp-ajouter]');
+  if (bouton) bouton.disabled = true;
+  var avant = etat.projects.length;
+  var data = await envoyerOps([{op: 'add_task', projet: projet, titre: titre}]);
+  // envoyerOps a deja signale l'echec et recharge l'etat : on ne retire la ligne
+  // de la fenetre que si l'operation a bien ete appliquee, sinon elle reste
+  // disponible pour un second essai avec un autre projet.
+  if (data && data.applied && data.applied.length) {
+    li.innerHTML = '<span class="lib"><b>' + esc(titre) + '</b></span>' +
+      '<span class="fait">ajoutée</span>';
+  } else if (bouton) {
+    bouton.disabled = false;
+  }
+}
+
+/* ---------- enchainement ---------- */
+modalHost.addEventListener('click', function(e){
+  var el;
+  if ((el = e.target.closest('[data-rapp-ok]'))) { validerRetraits(); return; }
+  if ((el = e.target.closest('[data-rapp-retablir]'))) { annulerRetraits(); return; }
+  if ((el = e.target.closest('[data-rapp-ajouter]'))) {
+    ajouterLigne(Number(el.getAttribute('data-rapp-ajouter')));
+    return;
+  }
+  if ((el = e.target.closest('[data-rapp-fermer]'))) {
+    fermerModale();
+    cloturerRapprochement();
+    return;
+  }
+});
+
+// Lance le rapprochement apres le premier chargement de l'etat. Aucune panne ici
+// ne doit empecher l'usage du tableau de bord : en cas d'echec, on se tait.
+async function lancerRapprochement(){
+  var data;
+  try {
+    var r = await fetch('/api/lancement');
+    data = await r.json();
+  } catch (e) {
+    return;
+  }
+  if (!data || !data.actif) return;
+  if (!data.aRetirer.length && !data.aAjouter.length) {
+    // Rien a proposer, mais le message est bien celui du jour : on le marque
+    // traite pour ne pas relire le fil a chaque ouverture.
+    rapprochement = data;
+    await cloturerRapprochement();
+    return;
+  }
+  rapprochement = data;
+  if (data.aRetirer.length) afficherRetraits();
+  else await etapeAjouts();
+}
+
+charger().then(lancerRapprochement);
 </script>

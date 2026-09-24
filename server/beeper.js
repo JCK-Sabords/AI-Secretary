@@ -92,4 +92,27 @@ async function envoyer(chatID, texte, opts) {
   return {ok: true, chatID: data.chatID, pendingMessageID: data.pendingMessageID};
 }
 
-module.exports = {comptes, disponible, chercherContacts, ouvrirChat, envoyer, BASE};
+// Derniers messages d une conversation, du plus recent au plus ancien.
+//
+// Beeper renvoie les messages tries par date croissante : on inverse ici, une
+// fois, pour que tous les appelants raisonnent dans le meme sens. Le texte
+// arrive en HTML des que le message porte une mise en forme (une liste a puces
+// WhatsApp devient <ul><li>) : il est renvoye tel quel, son interpretation
+// appartient a l appelant.
+async function messages(chatID, limite, opts) {
+  const n = Math.min(Math.max(Number(limite) || 20, 1), 100);
+  const data = await appel('/v1/chats/' + encodeURIComponent(chatID) +
+    '/messages?direction=before&limit=' + n, {method: 'GET'}, opts);
+  const items = Array.isArray(data.items) ? data.items : [];
+  return items.map((m) => ({
+    id: String(m.id),
+    timestamp: m.timestamp,
+    type: m.type,
+    texte: typeof m.text === 'string' ? m.text : '',
+    deMoi: m.isSender === true,
+    supprime: m.isDeleted === true
+  })).sort((a, b) => (a.timestamp < b.timestamp ? 1 : a.timestamp > b.timestamp ? -1 : 0));
+}
+
+module.exports = {comptes, disponible, chercherContacts, ouvrirChat, envoyer,
+  messages, BASE};

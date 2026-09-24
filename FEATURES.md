@@ -450,3 +450,46 @@ Deux consequences traitees dans la meme iteration :
 - le prompt de dictee precise que ce champ ne se saisit plus : une demande de changement de
   prochaine action sur un projet qui a des taches doit agir sur les taches (priorite ou
   creation), jamais sur le champ.
+
+## Iteration 24 : rapprochement avec la liste de taches WhatsApp
+
+Le proprietaire tient depuis longtemps sa liste de taches dans la conversation WhatsApp avec
+son propre numero : il y renvoie regulierement la meme liste a puces, amputee des lignes qu'il
+a faites. Le secretariat lit desormais ce fil a chaque ouverture du tableau de bord et en tire
+deux constats.
+
+**Une ligne disparue d'un message au suivant est une tache faite.** Une premiere fenetre liste
+ces taches, avec leur reference et leur projet. « OK » les retire du secretariat, « Retablir »
+les garde.
+
+**Une ligne de la liste qui ne correspond a aucune tache ouverte est une tache a creer.** Une
+seconde fenetre les liste, chacune avec le projet devine par Claude (la note n'indique jamais
+le projet) dans une liste deroulante modifiable, et un bouton `+`. Fermer la fenetre laisse de
+cote les lignes restantes.
+
+Trois decisions de conception meritent d'etre notees.
+
+**Rien n'est retire avant le clic sur OK.** La fenetre annonce une suppression, mais l'ecriture
+n'est envoyee qu'a la validation. Ce n'est pas de la prudence gratuite : les numeros de tache
+ne sont jamais reattribues, donc une tache supprimee puis recreee reviendrait sous une autre
+reference, `TO1` deviendrait `TO3`. Differer l'ecriture est le seul moyen pour que
+« Retablir » rende exactement l'etat d'avant.
+
+**Le message traite est memorise** dans `data/history/liste-whatsapp.json`. Sans cela, un
+« Retablir » serait defait a l'ouverture suivante, qui reproposerait la meme suppression, et
+les lignes volontairement laissees de cote reviendraient indefiniment.
+
+**Le rapprochement ne decide jamais seul.** `server/lancement.js` est en lecture seule : il
+constate et propose. Toute ecriture passe par `applyOps`, apres un geste explicite. Un
+appariement douteux est refuse plutot que tranche : le rapprochement compare les libelles sans
+accents ni casse ni ponctuation (coefficient de Dice sur les mots, seuil 0,72), ce qui accepte
+« TOPI FAM - faire page presse - 21 sept » face a « TOPI FAM - faire page presse » mais refuse
+« vendre BTC » face a « vendre actions » ; et si deux taches se disputent une ligne a moins de
+0,05 d'ecart, aucune n'est retenue.
+
+Le texte des lignes est traite comme une donnee, jamais comme une consigne : le prompt de
+classement porte la meme clause anti-injection que l'agent hebdomadaire, une ligne redigee
+comme un ordre restant un simple libelle de tache.
+
+La conversation se configure par `filTachesWhatsApp` dans `data/config.json`. Absente, le
+rapprochement est inactif et rien ne s'affiche.

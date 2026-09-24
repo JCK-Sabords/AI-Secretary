@@ -208,6 +208,18 @@ Toutes ecrivent dans les memes fichiers de `data/projects/` et `data/people.md`.
    en operations structurees, que le serveur valide avant de les appliquer : le modele ne peut
    jamais envoyer de message, seulement lire et ecrire des donnees.
 
+   **Au lancement**, si `filTachesWhatsApp` est renseigne dans `data/config.json`, le tableau de
+   bord compare la derniere liste de taches envoyee dans cette conversation a soi-meme avec la
+   precedente, et avec le portefeuille. Une premiere fenetre propose de retirer les taches dont
+   la ligne a disparu d'un message au suivant, donc faites (« OK » retire, « Retablir » garde,
+   et rien n'est ecrit avant ce clic). Une seconde propose d'ajouter les lignes qui ne
+   correspondent a aucune tache ouverte, chacune avec le projet devine par Claude, modifiable,
+   et un bouton `+` ; fermer la fenetre laisse de cote les lignes restantes. Le message traite
+   est memorise dans `data/history/liste-whatsapp.json`, pour qu'une reponse donnee ne soit pas
+   redemandee a l'ouverture suivante. Routes : `GET /api/lancement` (lecture seule),
+   `POST /api/lancement/deviner`, `POST /api/lancement/cloturer` ; les ecritures elles-memes
+   passent par `/api/ops` et `/api/tache` comme toutes les autres.
+
    La prochaine action d'un projet ne se saisit pas : c'est la tache ouverte la plus
    prioritaire, a priorite egale la premiere de la liste, donc celle placee en tete par
    glisser-deposer. La cellule affiche la reference de la tache puis son intitule et n'est pas

@@ -353,5 +353,5 @@ async function dicter(texte, ctx) {
   return extraireJson(sortie);
 }
 
-module.exports = {construirePrompt, extraireJson, dicter,
+module.exports = {construirePrompt, extraireJson, dicter, lancerClaudeReel,
   traiterSortieProcessus, resoudreBinaireClaude, argumentsClaude};
