@@ -193,11 +193,13 @@ Toutes ecrivent dans les memes fichiers de `data/projects/` et `data/people.md`.
 2. **Note a soi-meme dans Beeper** : l'agent hebdomadaire lit les messages non traites du fil
    designe dans `data/config.json` (`filNoteASoiMeme`) et les transforme en taches.
 3. **Dashboard** (`http://127.0.0.1:5556`) : le panneau « Ma semaine » porte le top 5 des
-   projets a faire avancer, etabli par Claude a chaque ouverture (`GET /api/semaine`,
-   `server/semaine.js`), avec pour chacun une justification, l'echeance et la part du travail
-   delegable a une IA. Seuls les projets portant au moins une tache ouverte sont eligibles, le
-   resultat est garde tant que le portefeuille ne change pas, et deux demandes simultanees
-   partagent un seul calcul. Les echeances s'affichent partout en delai (« dans 6 j », « en
+   taches a faire, etabli par Claude a chaque ouverture (`GET /api/semaine`,
+   `server/semaine.js`), chacune avec sa reference, sa priorite, son projet, une
+   justification, son echeance et la part de cette tache delegable a une IA. Seules les taches
+   ouvertes sont soumises au modele, et une reference absente de cette liste est ecartee a la
+   relecture : le panneau ne peut pas afficher un travail qui n'existe pas. Le resultat est
+   garde tant que le portefeuille ne change pas, et deux demandes simultanees partagent un
+   seul calcul. Les echeances s'affichent partout en delai (« dans 6 j », « en
    retard de 3 j »), la date exacte restant en infobulle, sauf au-dela de trente jours ou la
    date reprend la main. S'y ajoutent un formulaire d'edition en place pour les taches
    (titre, statut, responsable, echeance, nature, priorite, effort, plus les deux champs de

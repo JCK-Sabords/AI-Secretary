@@ -96,7 +96,13 @@ ul{margin:0;padding:0}
 .wk .quoi{min-width:0;display:flex;flex-direction:column;gap:2px}
 .wk .quoi b{font-family:var(--display);font-size:16px;font-weight:var(--display-wght);
   letter-spacing:var(--display-tight);color:var(--ink)}
-.wk .pourquoi{font-size:12px;color:var(--muted);line-height:1.4}
+.wk .meta{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:12px}
+.wk .meta .ref{font-family:var(--mono);font-size:10px;color:var(--muted);
+  letter-spacing:.04em}
+.wk .meta .prio{font-size:10px}
+.wk .meta .proj{font-family:var(--mono);font-size:9px;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted);opacity:.85}
+.wk .pourquoi{font-size:12px;color:var(--muted);line-height:1.4;flex-basis:100%}
 .wk .due{font-family:var(--mono);font-size:12px;color:var(--ink-2);white-space:nowrap}
 .wk .due.late{color:var(--crit);font-weight:600}
 .wk .due.proche{color:var(--warn);font-weight:600}
@@ -841,9 +847,10 @@ function renderBoard(){
 /* ============================ panneaux ============================ */
 // « Ma semaine » listait toutes les taches a echeance sous quatorze jours,
 // triees par date. C'etait un inventaire, pas une priorite : il ne disait pas
-// par quoi commencer. Il porte desormais le top 5 des projets a faire avancer
-// cette semaine, etabli par Claude a chaque ouverture, avec pour chacun la part
-// du travail qui peut lui etre sous-traitee.
+// par quoi commencer. Il porte desormais le top 5 des taches a faire cette
+// semaine, etabli par Claude a chaque ouverture, avec pour chacune la part du
+// travail qui peut lui etre sous-traitee. Le classement porte sur des taches et
+// non sur des projets : c'est une tache qu'on attaque un mardi matin.
 var semaine = null;          // {top, calculeLe} une fois la reponse arrivee
 var semaineEnCours = false;
 var semaineErreur = null;
@@ -866,39 +873,69 @@ function renderWeek(){
   var top = (semaine && semaine.top) || [];
   if (!top.length) {
     ul.innerHTML = '<li class="attente"><span class="hint">' +
-      'Aucun projet à faire avancer : plus une seule tâche ouverte.</span></li>';
+      'Rien à faire cette semaine : plus une seule tâche ouverte.</span></li>';
     compteur.textContent = '';
     return;
   }
 
   ul.innerHTML = top.map(function(x, i){
-    var p = projectById(x.projet);
     // Le classement vient d'un calcul anterieur, garde tant que le portefeuille
-    // ne bouge pas : un projet supprime entre-temps ne doit pas faire tomber le
-    // panneau, il disparait simplement de la liste.
-    if (!p) return '';
+    // ne bouge pas. Une tache supprimee ou close entre-temps ne doit pas faire
+    // tomber le panneau : elle disparait simplement de la liste, et c'est l'etat
+    // courant qui fait foi pour tout ce qui s'affiche.
+    var hit = tacheParRef(x.ref);
+    if (!hit) return '';
+    var p = hit.projet;
+    var t = hit.tache;
+
     var ech = '';
-    if (p.echeance !== '') {
-      var r = echeanceRelative(p.echeance, etat.today);
-      ech = '<span class="due ' + r.classe + '" title="' + esc(frDate(p.echeance)) + '">' +
+    if (t.echeance !== '') {
+      var r = echeanceRelative(t.echeance, etat.today);
+      ech = '<span class="due ' + r.classe + '" title="' + esc(frDate(t.echeance)) + '">' +
         esc(r.texte) + '</span>';
     }
     var pct = x.pourcentage_ia;
     var jauge = pct === null || pct === undefined ? '' :
-      '<span class="ia" title="Part du travail restant délégable à l\'IA">' +
+      '<span class="ia" title="Part de cette tâche délégable à l\'IA">' +
         '<span class="jauge"><i style="width:' + pct + '%"></i></span>' +
         '<b>' + pct + '%</b></span>';
+
+    // La ligne meta porte ce qui situe la tache : sa reference, qui sert a en
+    // parler a l'agent, sa priorite, son projet, puis la raison du classement.
+    var meta = '<span class="ref">' + esc(x.ref) + '</span>' +
+      '<span class="prio ' + esc(String(t.prio).toLowerCase()) + '">' + esc(t.prio) + '</span>' +
+      '<span class="proj">' + esc(p.titre) + '</span>' +
+      (x.pourquoi ? '<span class="pourquoi">' + esc(x.pourquoi) + '</span>' : '');
+
     return '<li data-goto="' + esc(p.id) + '">' +
       '<span class="rang">' + (i + 1) + '</span>' +
-      '<span class="quoi"><b>' + esc(p.titre) + '</b>' +
-        (x.pourquoi ? '<span class="pourquoi">' + esc(x.pourquoi) + '</span>' : '') +
-      '</span>' + ech + jauge + '</li>';
+      '<span class="quoi"><b>' + esc(t.titre) + '</b>' +
+        '<span class="meta">' + meta + '</span></span>' +
+      ech + jauge + '</li>';
   }).join('');
 
   compteur.textContent = semaine && semaine.calculeLe
     ? 'établi à ' + new Date(semaine.calculeLe).toLocaleTimeString('fr-FR',
         {hour: '2-digit', minute: '2-digit'}).replace(':', 'h')
     : '';
+}
+
+// Retrouve une tache par sa reference dans l'etat courant. Le panneau affiche
+// toujours le titre, la priorite et l'echeance lus ici, jamais ceux figes dans
+// le classement : une tache renommee ou reportee depuis le dernier calcul doit
+// s'afficher telle qu'elle est aujourd'hui.
+function tacheParRef(ref){
+  var cible = String(ref || '').toUpperCase();
+  for (var i = 0; i < etat.projects.length; i++) {
+    var p = etat.projects[i];
+    var taches = p.taches || [];
+    for (var j = 0; j < taches.length; j++) {
+      if ((p.prefixe + taches[j].n).toUpperCase() === cible) {
+        return {projet: p, tache: taches[j]};
+      }
+    }
+  }
+  return null;
 }
 
 // Un clic sur une ligne ouvre le projet concerne dans le portefeuille : la

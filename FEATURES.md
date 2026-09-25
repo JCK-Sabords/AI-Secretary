@@ -577,3 +577,32 @@ reste du tableau de bord ne l'attend pas.
 Au passage, `test/web.charger.test.js` n'evalue plus l'appel de demarrage du script : le simple
 fait de charger le fichier lancait la sequence d'ouverture reelle, dont l'activite asynchrone
 survivait a la fin du test.
+
+## Iteration 27 : « Ma semaine » classe des taches, pas des projets
+
+Correction de cadrage sur l'iteration precedente. Le panneau proposait le top 5 des projets a
+faire avancer ; ce n'est pas ce qui sert le mardi matin. On attaque une tache, pas un projet.
+
+Le classement porte desormais sur les taches ouvertes de tout le portefeuille. Chaque ligne
+donne l'intitule de la tache, sa reference, sa priorite, son projet, la raison de son rang,
+son echeance en delai, et la part de cette tache delegable a une IA.
+
+Le changement de granularite rend le pourcentage nettement plus utile. Sur un projet, il
+moyennait des travaux sans rapport entre eux. Sur une tache, il discrimine vraiment : « finir
+le secretaire IA » ressort a 85 %, « couper le versement du loyer » ou « vendre BTC » a 15 %,
+parce qu'aucune IA ne passera l'appel a la banque.
+
+Deux points de mise en oeuvre.
+
+**Les taches sont designees par leur reference** (`ES2`, `TO1`), unique dans tout le
+portefeuille et jamais reattribuee : c'est la seule cle sure pour relire la reponse du modele.
+Une reference absente de la liste soumise est ecartee, donc le panneau ne peut pas afficher une
+tache inventee, ni une tache close.
+
+**Le panneau relit toujours l'etat courant.** Le classement ne sert qu'a donner l'ordre et le
+pourcentage : le titre, la priorite et l'echeance affiches viennent de la tache telle qu'elle
+est aujourd'hui, et une tache supprimee depuis le dernier calcul disparait simplement de la
+liste au lieu de faire tomber le panneau.
+
+La justification ne repete plus la priorite, la reference ni le nom du projet, tous affiches a
+cote d'elle : elle porte la raison, pas l'etiquette.
