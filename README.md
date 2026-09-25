@@ -197,7 +197,8 @@ Toutes ecrivent dans les memes fichiers de `data/projects/` et `data/people.md`.
    `server/semaine.js`), chacune avec sa reference, sa priorite, son projet, une
    justification, son echeance et la part de cette tache delegable a une IA. Un bouton
    « Deleguer » y ouvre une session Claude Code avec la demande deja ecrite, via le schema
-   d'URL `claude-cli://open?q=...&cwd=...` que Claude Code enregistre sur le poste ; il est mis
+   d'URL `claude://code/new?q=...&folder=...` de l'application de bureau (et non
+   `claude-cli://`, qui ouvrirait un terminal) ; il est mis
    en avant au-dela de 50 % de delegabilite. Le champ facultatif `dossier` d'un projet, saisi
    dans son tiroir, fait ouvrir cette session directement dans le bon repertoire. Seules les taches
    ouvertes sont soumises au modele, et une reference absente de cette liste est ecartee a la

@@ -854,16 +854,21 @@ function renderBoard(){
 
 /* ============================ deleguer une tache a Claude Code ============================
    Un clic sur le bouton d'une ligne de « Ma semaine » ouvre une nouvelle session
-   Claude Code dans l'application de bureau, avec la demande deja ecrite et, si le
+   dans l'application Claude Code de bureau, avec la demande deja ecrite et, si le
    projet declare un dossier, la session ouverte directement dedans.
 
-   Le mecanisme est le schema d'URL claude-cli://, enregistre par Claude Code sur
-   le poste. Sa grammaire a ete relevee dans le binaire, pas supposee :
-   claude-cli://open?q=<demande>&cwd=<dossier absolu>&repo=<owner/repo>.
-   `open` est la seule action acceptee, `cwd` doit etre un chemin absolu sans
-   segment parent ni chemin reseau, et `q` ne depasse pas 5000 caracteres.
+   Le mecanisme est le schema d'URL claude://, celui de l'application de bureau.
+   Sa grammaire a ete relevee dans les ressources de l'application, pas supposee :
+   claude://code/new?q=<demande>&folder=<dossier>&file=<fichier>.
+   `q` (ou `prompt`) porte la demande et est tronquee a 14336 caracteres par
+   l'application ; `folder` et `file` acceptent plusieurs valeurs.
+
+   Il ne faut surtout pas confondre avec claude-cli://, l'autre schema enregistre
+   sur le poste : celui-la est gere par le binaire en ligne de commande et ouvre
+   une fenetre de terminal, pas une session dans l'application de bureau. C'est
+   l'erreur commise a la premiere version de ce bouton.
 */
-var LIMITE_DEMANDE = 5000;
+var LIMITE_DEMANDE = 14336;
 
 // Seuil a partir duquel la delegation est mise en avant plutot que discrete.
 // En dessous, la tache demande surtout du temps humain (un appel, un
@@ -907,9 +912,9 @@ function demandeDelegation(tache, projet, today){
   return fixe + entete + contexte;
 }
 
-// Un chemin relatif, un chemin reseau ou un segment parent serait refuse par
-// Claude Code : mieux vaut ne pas envoyer de dossier du tout qu'une URL qui
-// echoue au moment du clic.
+// Un chemin relatif, un chemin reseau ou un segment parent n'a pas de sens comme
+// dossier de session : mieux vaut ne pas envoyer de dossier du tout qu'ouvrir la
+// session au mauvais endroit.
 function cheminAbsoluValide(chemin){
   var c = String(chemin || '').trim();
   if (c === '') return false;
@@ -919,10 +924,10 @@ function cheminAbsoluValide(chemin){
 }
 
 function lienDelegation(tache, projet, today){
-  var url = 'claude-cli://open?q=' +
+  var url = 'claude://code/new?q=' +
     encodeURIComponent(demandeDelegation(tache, projet, today));
   if (cheminAbsoluValide(projet.dossier)) {
-    url += '&cwd=' + encodeURIComponent(String(projet.dossier).trim());
+    url += '&folder=' + encodeURIComponent(String(projet.dossier).trim());
   }
   return url;
 }

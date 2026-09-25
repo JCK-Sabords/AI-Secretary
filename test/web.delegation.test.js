@@ -4,12 +4,16 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-// Le lien de delegation ouvre une session Claude Code avec la demande deja
-// ecrite. Sa grammaire n'est pas negociable, elle a ete relevee dans le binaire
-// claude : claude-cli://open?q=<demande>&cwd=<chemin absolu>, `open` etant la
-// seule action acceptee et `q` etant plafonne a 5000 caracteres. Ces tests
-// verrouillent le respect de ces contraintes, qu'aucun navigateur ne signalera :
-// une URL fautive echoue silencieusement au moment du clic.
+// Le lien de delegation ouvre une session dans l'application Claude Code de
+// bureau, avec la demande deja ecrite. Sa grammaire a ete relevee dans les
+// ressources de l'application : claude://code/new?q=<demande>&folder=<dossier>,
+// `q` etant tronquee a 14336 caracteres.
+//
+// Le schema compte autant que le reste. claude-cli://, l'autre schema enregistre
+// sur le poste, ouvre une fenetre de terminal et non une session dans
+// l'application : c'est l'erreur de la premiere version, et le test ci-dessous
+// est la pour qu'elle ne revienne pas. Aucun navigateur ne signalerait la
+// difference, le clic ouvrirait simplement la mauvaise chose.
 
 function source() {
   return fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf8');
@@ -29,7 +33,7 @@ function chargerLien() {
       assert.notStrictEqual(fin, -1);
       return code.slice(i, fin + 2);
     });
-  morceaux.push('var LIMITE_DEMANDE = 5000;');
+  morceaux.push('var LIMITE_DEMANDE = 14336;');
   return new Function(morceaux.join('\n') +
     '\nreturn {demandeDelegation, lienDelegation, cheminAbsoluValide, LIMITE_DEMANDE};')();
 }
@@ -65,6 +69,7 @@ test('un blocage note est transmis', () => {
 // La contrainte dure : au-dela de 5000 caracteres, Claude Code refuse le lien.
 test('la demande ne depasse jamais la limite acceptee par Claude Code', () => {
   const {demandeDelegation, LIMITE_DEMANDE} = chargerLien();
+  assert.strictEqual(LIMITE_DEMANDE, 14336, 'plafond applique par l application de bureau');
   const enorme = Object.assign({}, PROJET, {contexte: 'x'.repeat(40000)});
   const d = demandeDelegation(TACHE, enorme, '2026-09-25');
   assert.ok(d.length <= LIMITE_DEMANDE, 'longueur ' + d.length);
@@ -74,17 +79,19 @@ test('la demande ne depasse jamais la limite acceptee par Claude Code', () => {
 
 test('un titre de tache demesure ne fait pas deborder le lien', () => {
   const {demandeDelegation, LIMITE_DEMANDE} = chargerLien();
-  const d = demandeDelegation(Object.assign({}, TACHE, {titre: 'y'.repeat(9000)}),
+  const d = demandeDelegation(Object.assign({}, TACHE, {titre: 'y'.repeat(30000)}),
     PROJET, '2026-09-25');
   assert.ok(d.length <= LIMITE_DEMANDE, 'longueur ' + d.length);
 });
 
-test('le lien vise l action open et encode la demande', () => {
+test('le lien vise l application de bureau, jamais le terminal', () => {
   const {lienDelegation} = chargerLien();
   const url = lienDelegation(TACHE, PROJET, '2026-09-25');
-  assert.ok(url.startsWith('claude-cli://open?q='), url.slice(0, 40));
+  assert.ok(url.startsWith('claude://code/new?q='), url.slice(0, 40));
+  assert.ok(!url.startsWith('claude-cli://'),
+    'claude-cli:// ouvrirait un terminal, pas une session de l application');
   assert.ok(!/[ \n"]/.test(url), 'aucun caractere brut non encode dans l URL');
-  assert.match(decodeURIComponent(url.slice('claude-cli://open?q='.length)),
+  assert.match(decodeURIComponent(url.slice('claude://code/new?q='.length)),
     /Refaire le site/);
 });
 
@@ -92,19 +99,19 @@ test('le dossier du projet est transmis quand il est absolu', () => {
   const {lienDelegation} = chargerLien();
   const url = lienDelegation(TACHE, Object.assign({}, PROJET,
     {dossier: 'C:\\Users\\alex\\topi'}), '2026-09-25');
-  assert.match(url, /&cwd=/);
-  assert.strictEqual(decodeURIComponent(url.split('&cwd=')[1]), 'C:\\Users\\alex\\topi');
+  assert.match(url, /&folder=/);
+  assert.strictEqual(decodeURIComponent(url.split('&folder=')[1]), 'C:\\Users\\alex\\topi');
 });
 
-// Claude Code refuse ces chemins : envoyer l URL quand meme ferait echouer le
-// clic sans rien expliquer. Mieux vaut ouvrir la session sans dossier.
-test('un dossier que Claude Code refuserait n est pas transmis', () => {
+// Un chemin relatif ou reseau n'a pas de sens comme dossier de session : mieux
+// vaut ouvrir sans dossier que d'ouvrir au mauvais endroit.
+test('un dossier qui n est pas un chemin absolu n est pas transmis', () => {
   const {lienDelegation, cheminAbsoluValide} = chargerLien();
   ['', '   ', 'topi', './topi', '../topi', 'C:\\Users\\..\\alex',
     '\\\\serveur\\partage', '//serveur/partage'].forEach((mauvais) => {
     assert.strictEqual(cheminAbsoluValide(mauvais), false, JSON.stringify(mauvais));
     assert.ok(!lienDelegation(TACHE, Object.assign({}, PROJET, {dossier: mauvais}),
-      '2026-09-25').includes('&cwd='), JSON.stringify(mauvais));
+      '2026-09-25').includes('&folder='), JSON.stringify(mauvais));
   });
 });
 

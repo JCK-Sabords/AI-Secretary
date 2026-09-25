@@ -617,24 +617,26 @@ consigne de commencer par expliquer comment il compte s'y prendre.
 Le bouton est mis en avant au-dela de 50 % de delegabilite, discret en dessous, jamais absent :
 le pourcentage n'est qu'une estimation, c'est le proprietaire qui tranche.
 
-**Le mecanisme n'a pas ete devine.** Claude Code enregistre sur le poste un schema d'URL
-`claude-cli://`, dont le gestionnaire est `claude.exe --handle-uri`. Sa grammaire a ete relevee
-dans le binaire :
+**Deux schemas d'URL sont enregistres sur le poste, et ils ne font pas la meme chose.** La
+premiere version de ce bouton utilisait `claude-cli://open`, gere par le binaire en ligne de
+commande : il ouvre une fenetre de terminal. Ce n'est pas ce qui etait demande. Le bon schema
+est `claude://`, celui de l'application de bureau, le meme que ses propres entrees de menu
+(`claude://code/new?source=desktop_action`). Sa grammaire a ete relevee dans les ressources de
+l'application :
 
 ```
-claude-cli://open?q=<demande>&cwd=<dossier absolu>&repo=<owner/repo>
+claude://code/new?q=<demande>&folder=<dossier>&file=<fichier>
 ```
 
-`open` est la seule action acceptee, `cwd` doit etre un chemin absolu sans segment parent ni
-chemin reseau, et `q` est plafonne a 5000 caracteres, limite verifiee en la depassant. Ces trois
-contraintes sont respectees par construction et verrouillees par `test/web.delegation.test.js` :
-une URL fautive echouerait silencieusement au moment du clic, sans qu'aucun navigateur ne
-signale quoi que ce soit.
+`q` porte la demande, `prompt` en est un alias, et l'application la tronque a 14336 caracteres ;
+`folder` et `file` acceptent plusieurs valeurs. `test/web.delegation.test.js` verrouille le
+schema autant que le reste : aucun navigateur ne signalerait la difference entre les deux, le
+clic ouvrirait simplement la mauvaise chose.
 
 Le contexte du projet est tronque avant tout le reste quand la demande approche la limite : la
 tache et la consigne finale doivent survivre, pas le contexte.
 
 Un champ **dossier de travail** est ajoute aux projets, facultatif. Renseigne, la session
-s'ouvre directement dedans. Un chemin relatif ou reseau est ignore plutot que transmis, puisque
-Claude Code le refuserait. Le secretariat ne lit et n'ecrit jamais rien a cet endroit : ce champ
-ne sert qu'a construire le lien.
+s'ouvre directement dedans. Un chemin relatif ou reseau est ignore plutot que transmis : mieux
+vaut ouvrir sans dossier qu'au mauvais endroit. Le secretariat ne lit et n'ecrit jamais rien a
+cet endroit, ce champ ne sert qu'a construire le lien.
