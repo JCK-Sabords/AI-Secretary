@@ -195,7 +195,11 @@ Toutes ecrivent dans les memes fichiers de `data/projects/` et `data/people.md`.
 3. **Dashboard** (`http://127.0.0.1:5556`) : le panneau « Ma semaine » porte le top 5 des
    taches a faire, etabli par Claude a chaque ouverture (`GET /api/semaine`,
    `server/semaine.js`), chacune avec sa reference, sa priorite, son projet, une
-   justification, son echeance et la part de cette tache delegable a une IA. Seules les taches
+   justification, son echeance et la part de cette tache delegable a une IA. Un bouton
+   « Deleguer » y ouvre une session Claude Code avec la demande deja ecrite, via le schema
+   d'URL `claude-cli://open?q=...&cwd=...` que Claude Code enregistre sur le poste ; il est mis
+   en avant au-dela de 50 % de delegabilite. Le champ facultatif `dossier` d'un projet, saisi
+   dans son tiroir, fait ouvrir cette session directement dans le bon repertoire. Seules les taches
    ouvertes sont soumises au modele, et une reference absente de cette liste est ecartee a la
    relecture : le panneau ne peut pas afficher un travail qui n'existe pas. Le resultat est
    garde tant que le portefeuille ne change pas, et deux demandes simultanees partagent un

@@ -15,7 +15,12 @@ const TASK_DEFAULTS = {
 
 const PROJECT_DEFAULTS = {
   id: '', prefixe: '', titre: '', domaine: 'side', statut: 'actif',
-  echeance: '', prochaine_action: '', jira: '', dernier_n: 0, ordre: 0
+  echeance: '', prochaine_action: '', jira: '', dernier_n: 0, ordre: 0,
+  // Dossier de travail du projet sur le disque, facultatif. Il ne sert qu'a une
+  // chose : ouvrir une session Claude Code directement au bon endroit depuis le
+  // tableau de bord. Rien n'y est jamais lu ni ecrit par le secretariat, qui ne
+  // connait que data/.
+  dossier: ''
 };
 
 function parseProject(text) {
@@ -240,7 +245,7 @@ const DOMAINES_PROJET = {
 const CHAMPS_TACHE = ['titre', 'statut', 'responsable', 'echeance',
   'nature_echeance', 'prio', 'effort', 'bloque_par', 'derniere_relance',
   'prochaine_relance', 'note_blocage'];
-const CHAMPS_PROJET = ['titre', 'domaine', 'echeance', 'prochaine_action', 'statut', 'jira'];
+const CHAMPS_PROJET = ['titre', 'domaine', 'echeance', 'prochaine_action', 'statut', 'jira', 'dossier'];
 
 // Champs date : chaine vide (pas de date) ou format AAAA-MM-JJ exact, rien d'autre.
 // Ces quatre champs de tache et le champ echeance de projet partagent la regle.

@@ -55,6 +55,7 @@ Extension Chrome d'estimation immobiliere, repo exemple/estimmo.
 | `statut` | `actif`, `en_pause`, `termine` ou `abandonne` |
 | `echeance` | `AAAA-MM-JJ`, ou chaine vide si aucune |
 | `prochaine_action` | phrase libre, vide autorise. Ne sert que si le projet n'a aucune tache ouverte : sinon la prochaine action est deduite, c'est la tache ouverte la plus prioritaire (a priorite egale, la premiere de la liste) |
+| `dossier` | chemin absolu du dossier de travail du projet, facultatif. Sert uniquement a ouvrir une session Claude Code au bon endroit depuis le bouton « Deleguer » ; rien n'y est jamais lu ni ecrit |
 | `jira` | reference de ticket dans l'outil de suivi de l'employeur, renseignee uniquement pour un projet `domaine: pro` |
 | `dernier_n` | numero de tache le plus haut jamais attribue dans ce projet, ne jamais le faire descendre |
 | `taches` | liste des taches, voir plus bas |

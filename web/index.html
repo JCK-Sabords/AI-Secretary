@@ -84,7 +84,7 @@ body{
 .count{font-family:var(--mono);font-size:11px;color:var(--muted)}
 
 ul{margin:0;padding:0}
-.wk li{display:grid;grid-template-columns:22px 1fr auto auto;gap:14px;align-items:center;
+.wk li{display:grid;grid-template-columns:22px 1fr auto auto auto;gap:14px;align-items:center;
   padding:12px 0;border-bottom:1px solid var(--rule-soft);cursor:pointer}
 .wk li:last-child{border-bottom:0}
 .wk li:hover{background:var(--surface-2)}
@@ -113,6 +113,14 @@ ul{margin:0;padding:0}
 .wk .ia .jauge{width:44px;height:4px;background:var(--rule);display:block}
 .wk .ia .jauge i{display:block;height:100%;background:var(--accent)}
 .wk .ia b{font-family:var(--mono);font-size:11px;color:var(--ink-2);font-weight:500}
+/* Deleguer : ouvre une session Claude Code sur la tache. Mis en avant quand la
+   tache s'y prete, discret sinon, jamais absent. */
+.wk .deleg{font-family:var(--mono);font-size:10px;letter-spacing:.06em;
+  text-transform:uppercase;text-decoration:none;white-space:nowrap;
+  padding:5px 9px;border:1px solid var(--rule);color:var(--muted)}
+.wk .deleg:hover{border-color:var(--ink-2);color:var(--ink)}
+.wk .deleg.fort{border-color:var(--accent);color:var(--accent)}
+.wk .deleg.fort:hover{background:var(--accent-soft)}
 
 .rl .item{padding:13px 16px;border-bottom:1px solid var(--rule-soft);display:flex;flex-direction:column;gap:8px}
 .rl .item:last-child{border-bottom:0}
@@ -844,6 +852,81 @@ function renderBoard(){
   });
 }
 
+/* ============================ deleguer une tache a Claude Code ============================
+   Un clic sur le bouton d'une ligne de « Ma semaine » ouvre une nouvelle session
+   Claude Code dans l'application de bureau, avec la demande deja ecrite et, si le
+   projet declare un dossier, la session ouverte directement dedans.
+
+   Le mecanisme est le schema d'URL claude-cli://, enregistre par Claude Code sur
+   le poste. Sa grammaire a ete relevee dans le binaire, pas supposee :
+   claude-cli://open?q=<demande>&cwd=<dossier absolu>&repo=<owner/repo>.
+   `open` est la seule action acceptee, `cwd` doit etre un chemin absolu sans
+   segment parent ni chemin reseau, et `q` ne depasse pas 5000 caracteres.
+*/
+var LIMITE_DEMANDE = 5000;
+
+// Seuil a partir duquel la delegation est mise en avant plutot que discrete.
+// En dessous, la tache demande surtout du temps humain (un appel, un
+// rendez-vous, une decision) et proposer une session ferait perdre du temps.
+var SEUIL_DELEGABLE = 50;
+
+// Compose la demande pre-saisie dans la nouvelle session. Fonction pure, pour
+// etre verifiable sans navigateur : elle prend la tache, son projet et la date
+// du jour, et rend le texte tel qu'il sera transmis.
+//
+// Le contexte du projet est inclus parce que c'est lui qui rend la demande
+// exploitable, mais il est tronque avant tout le reste : la demande elle-meme ne
+// doit jamais etre amputee par un contexte trop long.
+function demandeDelegation(tache, projet, today){
+  var lignes = [];
+  lignes.push('Tâche à faire : ' + tache.titre);
+
+  var situe = 'Projet : ' + projet.titre + ' (référence ' + projet.prefixe + tache.n +
+    ', priorité ' + tache.prio;
+  if (tache.echeance !== '') {
+    situe += ', échéance ' + frDate(tache.echeance) +
+      ' soit ' + echeanceRelative(tache.echeance, today).texte;
+  } else {
+    situe += ', sans échéance';
+  }
+  lignes.push(situe + ').');
+
+  if (tache.note_blocage) lignes.push('Blocage noté : ' + tache.note_blocage);
+  lignes.push('');
+  lignes.push("Aide-moi à faire avancer cette tâche. Commence par me dire comment tu comptes " +
+    "t'y prendre, et signale-moi ce dont tu as besoin de ma part.");
+
+  var fixe = lignes.join('\n');
+  var contexte = String(projet.contexte || '').trim();
+  if (contexte === '') return fixe.slice(0, LIMITE_DEMANDE);
+
+  var entete = '\n\nContexte du projet :\n';
+  var place = LIMITE_DEMANDE - fixe.length - entete.length;
+  if (place < 120) return fixe.slice(0, LIMITE_DEMANDE);
+  if (contexte.length > place) contexte = contexte.slice(0, place - 3) + '...';
+  return fixe + entete + contexte;
+}
+
+// Un chemin relatif, un chemin reseau ou un segment parent serait refuse par
+// Claude Code : mieux vaut ne pas envoyer de dossier du tout qu'une URL qui
+// echoue au moment du clic.
+function cheminAbsoluValide(chemin){
+  var c = String(chemin || '').trim();
+  if (c === '') return false;
+  if (c.indexOf('..') !== -1) return false;
+  if (c.slice(0, 2) === '\\\\' || c.slice(0, 2) === '//') return false;
+  return c.charAt(0) === '/' || /^[a-zA-Z]:[/\\]/.test(c);
+}
+
+function lienDelegation(tache, projet, today){
+  var url = 'claude-cli://open?q=' +
+    encodeURIComponent(demandeDelegation(tache, projet, today));
+  if (cheminAbsoluValide(projet.dossier)) {
+    url += '&cwd=' + encodeURIComponent(String(projet.dossier).trim());
+  }
+  return url;
+}
+
 /* ============================ panneaux ============================ */
 // « Ma semaine » listait toutes les taches a echeance sous quatorze jours,
 // triees par date. C'etait un inventaire, pas une priorite : il ne disait pas
@@ -900,6 +983,17 @@ function renderWeek(){
         '<span class="jauge"><i style="width:' + pct + '%"></i></span>' +
         '<b>' + pct + '%</b></span>';
 
+    // Le lien ouvre une session Claude Code avec la demande deja ecrite. Il est
+    // mis en avant quand la tache se delegue bien, discret sinon : sur une tache
+    // qui demande un appel ou un deplacement, ouvrir une session ferait perdre
+    // du temps. Il reste present dans les deux cas, le pourcentage n'est qu'une
+    // estimation et c'est lui qui decide.
+    var delegable = pct !== null && pct !== undefined && pct >= SEUIL_DELEGABLE;
+    var lien = '<a class="deleg' + (delegable ? ' fort' : '') + '" ' +
+      'href="' + esc(lienDelegation(t, p, etat.today)) + '" ' +
+      'title="Ouvrir une session Claude Code sur cette tâche, demande pré-remplie"' +
+      '>Déléguer</a>';
+
     // La ligne meta porte ce qui situe la tache : sa reference, qui sert a en
     // parler a l'agent, sa priorite, son projet, puis la raison du classement.
     var meta = '<span class="ref">' + esc(x.ref) + '</span>' +
@@ -911,7 +1005,7 @@ function renderWeek(){
       '<span class="rang">' + (i + 1) + '</span>' +
       '<span class="quoi"><b>' + esc(t.titre) + '</b>' +
         '<span class="meta">' + meta + '</span></span>' +
-      ech + jauge + '</li>';
+      ech + jauge + lien + '</li>';
   }).join('');
 
   compteur.textContent = semaine && semaine.calculeLe
@@ -941,6 +1035,9 @@ function tacheParRef(ref){
 // Un clic sur une ligne ouvre le projet concerne dans le portefeuille : la
 // semaine sert a decider, le portefeuille a agir, autant relier les deux.
 document.getElementById('wk').addEventListener('click', function(e){
+  // Le lien de delegation est une vraie ancre : on le laisse agir seul, sans
+  // deplier le projet dans le portefeuille par-dessus.
+  if (e.target.closest('.deleg')) return;
   var li = e.target.closest('[data-goto]');
   if (!li) return;
   var id = li.getAttribute('data-goto');
@@ -1304,7 +1401,8 @@ function domaineOptsProjet(val){
 
 function projectDrawerHtml(p){
   var isNew = !p;
-  var v = p || {id: '', titre: '', domaine: 'side', echeance: '', prochaine_action: '', jira: ''};
+  var v = p || {id: '', titre: '', domaine: 'side', echeance: '', prochaine_action: '',
+    jira: '', dossier: ''};
   pdIdTouche = false;
   var idField = isNew
     ? '<input type="text" id="pd-id" value="' + esc(v.id) + '">'
@@ -1336,6 +1434,14 @@ function projectDrawerHtml(p){
           (v.domaine === 'pro' ? '' : ' hidden style="display:none"') + '>' +
           '<label class="k" for="pd-jira">Référence Jira</label>' +
           '<input type="text" id="pd-jira" value="' + esc(v.jira) + '"></div>' +
+        // Sert uniquement au bouton « Deleguer » de Ma semaine, pour ouvrir la
+        // session Claude Code directement dans le dossier du projet. Le
+        // secretariat ne lit et n'ecrit jamais rien a cet endroit.
+        '<div class="f"><label class="k" for="pd-dossier">Dossier de travail</label>' +
+          '<input type="text" id="pd-dossier" value="' + esc(v.dossier || '') +
+            '" placeholder="Chemin absolu, vide si aucun">' +
+          '<span class="hint">Facultatif. Ouvre la session Claude Code au bon endroit ' +
+          'quand tu délègues une tâche de ce projet.</span></div>' +
         (isNew ? '' : '<div class="eactions"><span class="spacer"></span>' +
           '<button class="btn danger" type="button" data-del-project="' + esc(v.id) + '">Supprimer le projet</button></div>') +
       '</div><footer>' +
@@ -1364,7 +1470,8 @@ async function saveProjectDrawer(existingId){
     prochaine_action: document.getElementById('pd-next').value,
     // Le champ Jira n'a de sens que pour le domaine pro : une valeur saisie
     // puis le domaine change avant l'enregistrement ne doit pas survivre.
-    jira: domaine === 'pro' ? document.getElementById('pd-jira').value : ''
+    jira: domaine === 'pro' ? document.getElementById('pd-jira').value : '',
+    dossier: document.getElementById('pd-dossier').value.trim()
   };
   var data;
   if (existingId) {

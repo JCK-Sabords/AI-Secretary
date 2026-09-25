@@ -606,3 +606,35 @@ liste au lieu de faire tomber le panneau.
 
 La justification ne repete plus la priorite, la reference ni le nom du projet, tous affiches a
 cote d'elle : elle porte la raison, pas l'etiquette.
+
+## Iteration 28 : deleguer une tache a Claude Code en un clic
+
+Chaque ligne de « Ma semaine » porte un bouton **Deleguer**. Il ouvre une nouvelle session
+Claude Code dans l'application de bureau, avec la demande deja ecrite : la tache, son projet, sa
+reference, sa priorite, son echeance en delai, le blocage eventuel, le contexte du projet, et la
+consigne de commencer par expliquer comment il compte s'y prendre.
+
+Le bouton est mis en avant au-dela de 50 % de delegabilite, discret en dessous, jamais absent :
+le pourcentage n'est qu'une estimation, c'est le proprietaire qui tranche.
+
+**Le mecanisme n'a pas ete devine.** Claude Code enregistre sur le poste un schema d'URL
+`claude-cli://`, dont le gestionnaire est `claude.exe --handle-uri`. Sa grammaire a ete relevee
+dans le binaire :
+
+```
+claude-cli://open?q=<demande>&cwd=<dossier absolu>&repo=<owner/repo>
+```
+
+`open` est la seule action acceptee, `cwd` doit etre un chemin absolu sans segment parent ni
+chemin reseau, et `q` est plafonne a 5000 caracteres, limite verifiee en la depassant. Ces trois
+contraintes sont respectees par construction et verrouillees par `test/web.delegation.test.js` :
+une URL fautive echouerait silencieusement au moment du clic, sans qu'aucun navigateur ne
+signale quoi que ce soit.
+
+Le contexte du projet est tronque avant tout le reste quand la demande approche la limite : la
+tache et la consigne finale doivent survivre, pas le contexte.
+
+Un champ **dossier de travail** est ajoute aux projets, facultatif. Renseigne, la session
+s'ouvre directement dedans. Un chemin relatif ou reseau est ignore plutot que transmis, puisque
+Claude Code le refuserait. Le secretariat ne lit et n'ecrit jamais rien a cet endroit : ce champ
+ne sert qu'a construire le lien.
