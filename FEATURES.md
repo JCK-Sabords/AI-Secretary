@@ -529,3 +529,51 @@ Ce qui change, c'est que ce choix est desormais explicite au lieu d'etre le gest
 `test/web.ajouts.test.js` verrouille la lecon : le bouton qui abandonne ne doit jamais porter
 la classe `primary`, le pied doit toujours annoncer combien de lignes attendent, et le premier
 rendu doit preceder l'attente de Claude.
+
+## Iteration 26 : hierarchie visuelle, echeances en delai, et « Ma semaine » etablie par Claude
+
+Quatre changements demandes apres plusieurs semaines d'usage quotidien, tous sur la meme
+question : ce qui compte ne se voyait pas assez.
+
+**Le mode d'emploi de la dictee est retire.** Il occupait la hauteur d'un paragraphe a chaque
+ouverture pour redire ce que le champ de saisie indique deja. Le journal des echanges ne prend
+plus aucune place tant qu'aucun echange n'a eu lieu (`.log:empty{display:none}`).
+
+**Les echeances se lisent en delai, plus en date.** « dans 6 j » dit tout de suite ce que
+« 1 oct. » oblige a calculer. La regle est portee par `echeanceRelative` : « en retard de 3 j »,
+« aujourd'hui », « demain », « dans N j » jusqu'a trente jours, puis la date au-dela, ou le
+delai perdrait son sens (« dans 97 j » n'aide personne). La date exacte reste en infobulle, et
+une echeance sous sept jours passe en couleur d'alerte, comme un retard.
+
+**Les titres passent devant leurs metadonnees.** Titre de projet de 17 a 20 pixels, intitule de
+tache de 14 a 15 avec une graisse moyenne, code de projet et domaine reduits et attenues. Les
+objets du portefeuille se lisent, leur etiquetage s'efface.
+
+**« Ma semaine » devient un classement, plus un inventaire.** Le panneau listait toutes les
+taches a echeance sous quatorze jours, triees par date : il disait ce qui arrivait, jamais par
+quoi commencer. Il porte desormais le **top 5 des projets** a faire avancer, etabli par Claude a
+chaque ouverture, avec pour chacun une justification d'une ligne, l'echeance en delai, et la
+**part du travail delegable a une IA** en pourcentage, affichee en jauge pour que les cinq
+lignes se comparent d'un coup d'oeil. Un clic sur une ligne deplie le projet dans le
+portefeuille.
+
+Trois points de conception sur ce classement.
+
+**Seuls les projets portant au moins une tache ouverte sont eligibles.** Demander au modele de
+les eviter ne suffisait pas : sur un projet vide, il deduisait du titre un travail restant qui
+n'existait nulle part et le presentait comme un fait. La regle est appliquee dans
+`server/semaine.js`, pas plaidee dans le prompt.
+
+**Le resultat est garde tant que le portefeuille ne bouge pas.** L'empreinte couvre les projets
+eligibles, leurs taches ouvertes et la date du jour : un rechargement de page ne redepense pas
+trente secondes d'appel, mais la moindre modification de tache fait recalculer.
+
+**Deux demandes simultanees partagent un seul calcul.** Sans cela, un rechargement pendant le
+calcul lancait un second binaire `claude` pour exactement le meme resultat.
+
+Le panneau affiche son attente (« Claude etablit ta semaine... ») au lieu de rester vide, et le
+reste du tableau de bord ne l'attend pas.
+
+Au passage, `test/web.charger.test.js` n'evalue plus l'appel de demarrage du script : le simple
+fait de charger le fichier lancait la sequence d'ouverture reelle, dont l'activite asynchrone
+survivait a la fin du test.

@@ -84,13 +84,29 @@ body{
 .count{font-family:var(--mono);font-size:11px;color:var(--muted)}
 
 ul{margin:0;padding:0}
-.wk li{display:grid;grid-template-columns:34px 1fr auto auto;gap:12px;align-items:center;
-  padding:10px 16px;border-bottom:1px solid var(--rule-soft);list-style:none}
+.wk li{display:grid;grid-template-columns:22px 1fr auto auto;gap:14px;align-items:center;
+  padding:12px 0;border-bottom:1px solid var(--rule-soft);cursor:pointer}
 .wk li:last-child{border-bottom:0}
-.wk .ref{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.wk li:hover{background:var(--surface-2)}
+.wk li.attente{grid-template-columns:1fr;cursor:default}
+.wk li.attente:hover{background:transparent}
+/* Le rang dit l'ordre dans lequel attaquer la semaine : il est discret mais
+   toujours present, c'est lui qui transforme une liste en classement. */
+.wk .rang{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:center}
+.wk .quoi{min-width:0;display:flex;flex-direction:column;gap:2px}
+.wk .quoi b{font-family:var(--display);font-size:16px;font-weight:var(--display-wght);
+  letter-spacing:var(--display-tight);color:var(--ink)}
+.wk .pourquoi{font-size:12px;color:var(--muted);line-height:1.4}
 .wk .due{font-family:var(--mono);font-size:12px;color:var(--ink-2);white-space:nowrap}
 .wk .due.late{color:var(--crit);font-weight:600}
+.wk .due.proche{color:var(--warn);font-weight:600}
 .wk .due.soft{color:var(--muted);border-bottom:1px dashed var(--muted)}
+/* Part delegable a l'IA : une jauge courte plutot qu'un nombre seul, pour que
+   les cinq lignes se comparent d'un coup d'oeil. */
+.wk .ia{display:flex;align-items:center;gap:7px;white-space:nowrap}
+.wk .ia .jauge{width:44px;height:4px;background:var(--rule);display:block}
+.wk .ia .jauge i{display:block;height:100%;background:var(--accent)}
+.wk .ia b{font-family:var(--mono);font-size:11px;color:var(--ink-2);font-weight:500}
 
 .rl .item{padding:13px 16px;border-bottom:1px solid var(--rule-soft);display:flex;flex-direction:column;gap:8px}
 .rl .item:last-child{border-bottom:0}
@@ -144,8 +160,10 @@ thead th{
 .sevbar{width:4px;height:46px;display:block;background:var(--ok)}
 .sevbar.warn{background:var(--warn)} .sevbar.crit{background:var(--crit)} .sevbar.idle{background:var(--rule)}
 .pname{display:flex;flex-direction:column;gap:3px;min-width:200px}
-.pname b{font-family:var(--display);font-size:17px;font-weight:var(--display-wght);letter-spacing:var(--display-tight)}
-.dom{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.pname b{font-family:var(--display);font-size:20px;font-weight:var(--display-wght);
+  letter-spacing:var(--display-tight);color:var(--ink);line-height:1.15}
+.dom{font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);opacity:.75}
 .dom.pro{color:var(--accent)}
 /* Volume et priorite du projet, lisibles ligne fermee. Meme famille mono que le
    reste des metadonnees, pour rester en retrait du titre. */
@@ -153,8 +171,10 @@ thead th{
 .pmeta .vol{font-family:var(--mono);font-size:10px;letter-spacing:.05em;
   text-transform:uppercase;color:var(--muted)}
 .prio.pprio{font-size:10px;text-align:left;letter-spacing:.05em}
-td.date{font-family:var(--mono);font-size:12px;white-space:nowrap;color:var(--ink-2)}
+td.date{font-family:var(--mono);font-size:13px;white-space:nowrap;color:var(--ink-2);font-weight:500}
+td.date .cell span[title]{white-space:nowrap}
 td.date.late{color:var(--crit);font-weight:600}
+td.date.proche{color:var(--warn);font-weight:600}
 td.date.none{color:var(--muted)}
 .next{color:var(--ink-2);max-width:320px}
 .next.empty{color:var(--crit)}
@@ -203,7 +223,7 @@ td.date.none{color:var(--muted)}
 .prow.dragover{outline:2px dashed var(--accent);outline-offset:-2px}
 .task.done .ttl{color:var(--muted);text-decoration:line-through}
 .ref{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--ink-2)}
-.ttl{font-size:14px}
+.ttl{font-size:15px;color:var(--ink);font-weight:500}
 .pill{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 7px;
   border:1px solid currentColor;display:inline-block;white-space:nowrap}
 .pill.encours{color:var(--accent);background:var(--accent-soft)}
@@ -214,7 +234,8 @@ td.date.none{color:var(--muted)}
 .resp .av{width:21px;height:21px;font-size:9px;flex:none}
 .resp.moi .av{background:transparent;color:var(--muted);border-color:var(--rule)}
 .resp span.n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tdate{font-family:var(--mono);font-size:12px;color:var(--ink-2);justify-self:start;white-space:nowrap}
+.tdate{font-family:var(--mono);font-size:12px;color:var(--ink-2);justify-self:start;white-space:nowrap;font-weight:500}
+.tdate.proche{color:var(--warn);font-weight:600}
 .tdate.soft{color:var(--muted);border-bottom:1px dashed var(--muted)}
 .tdate.late{color:var(--crit);font-weight:600}
 /* priorite : une seule teinte, quatre degres d'insistance */
@@ -296,6 +317,10 @@ textarea{font-family:var(--body);font-size:14px;line-height:1.55;color:var(--ink
 .agent .state{font-family:var(--mono);font-size:10px;opacity:.75}
 .agent .fold{font-family:var(--mono);font-size:13px;line-height:1;opacity:.8}
 .agent.collapsed .log,.agent.collapsed form{display:none}
+/* Tant qu'aucun echange n'a eu lieu, le journal ne prend aucune place : le
+   mode d'emploi qui l'occupait a ete retire, un cadre vide a sa place serait le
+   meme encombrement pour moins encore. */
+.log:empty{display:none}
 .log{padding:12px 14px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;
   max-height:210px;min-height:64px}
 .msg{font-size:13px;line-height:1.55}
@@ -400,14 +425,10 @@ footer.legalese{margin-top:40px;padding-top:16px;border-top:1px solid var(--rule
     <span class="hdr-right"><span class="state" id="agentState"></span>
       <span class="fold" id="agentFold">−</span></span>
   </header>
-  <div class="log" id="log">
-    <div class="hint">
-      Dicte une demande en français, par exemple <code>ajoute une tâche sur Estimmo :
-      relancer le notaire, P2, pour le 20 septembre</code>. Le serveur local interroge
-      Claude, puis applique les opérations obtenues aux mêmes règles que le reste de
-      l'interface.
-    </div>
-  </div>
+  <!-- Le mode d'emploi qui occupait cette place a ete retire : il prenait la
+       hauteur d'un paragraphe a chaque ouverture pour redire ce que le champ de
+       saisie indique deja. Le journal des echanges le remplit desormais seul. -->
+  <div class="log" id="log"></div>
   <form id="agentForm">
     <textarea id="agentInput" rows="1" placeholder="Dicte une demande en langage naturel... (Entrée envoie, Maj+Entrée ajoute une ligne)"></textarea>
     <button class="send" type="submit" id="agentSend">Envoyer</button>
@@ -456,6 +477,18 @@ function addDays(iso, n){
   return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
 }
 function frDate(s){ return D(s).toLocaleDateString('fr-FR', {day:'numeric', month:'short'}); }
+// Une echeance se lit en delai, pas en date : « dans 6 j » dit tout de suite ce
+// que « 1 oct. » oblige a calculer. Au-dela d'un mois le delai perd son sens
+// (« dans 87 j » n'aide personne), la date reprend alors la main. La date exacte
+// reste toujours accessible en infobulle.
+function echeanceRelative(iso, today){
+  var d = daysBetween(iso, today);
+  if (d < 0) return {texte: 'en retard de ' + (-d) + ' j', classe: 'late', jours: d};
+  if (d === 0) return {texte: "aujourd'hui", classe: 'late', jours: 0};
+  if (d === 1) return {texte: 'demain', classe: 'proche', jours: 1};
+  if (d <= 30) return {texte: 'dans ' + d + ' j', classe: d <= 7 ? 'proche' : '', jours: d};
+  return {texte: frDate(iso), classe: '', jours: d};
+}
 function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 
@@ -509,9 +542,11 @@ function respHtml(responsable){
 }
 function dateHtml(t){
   if (t.echeance === '') return '<span class="tdate soft">sans date</span>';
-  var late = daysBetween(t.echeance, etat.today) < 0 && t.statut !== 'fait';
-  return '<span class="tdate ' + (late ? 'late' : (t.nature_echeance === 'souhaitee' ? 'soft' : '')) + '">' +
-    frDate(t.echeance) + '</span>';
+  var r = echeanceRelative(t.echeance, etat.today);
+  var classe = (r.classe === 'late' && t.statut !== 'fait') ? 'late'
+    : (t.nature_echeance === 'souhaitee' ? 'soft' : r.classe);
+  return '<span class="tdate ' + classe + '" title="' + esc(frDate(t.echeance)) + '">' +
+    esc(r.texte) + '</span>';
 }
 // Une seule cellule d'une tache en edition en place (step 6) : le champ est
 // affiche comme entree/liste/date selon sa nature, et enregistre a Entree ou a
@@ -745,8 +780,10 @@ function renderBoard(){
     var domCls = String(p.domaine || '').replace(/[^a-z0-9_-]/gi, '');
 
     var titreHtml = celluleProjet(p, 'titre', '<b>' + esc(p.titre) + '</b>');
+    var rp = p.echeance === '' ? null : echeanceRelative(p.echeance, etat.today);
     var echHtml = celluleProjet(p, 'echeance',
-      p.echeance === '' ? 'sans date' : frDate(p.echeance));
+      rp === null ? 'sans date'
+        : '<span title="' + esc(frDate(p.echeance)) + '">' + esc(rp.texte) + '</span>');
     // La prochaine action n'est plus saisie a la main des lors que le projet
     // porte des taches : le serveur la deduit (la tache ouverte la plus
     // prioritaire, voir store.prochaineAction) et la cellule devient un simple
@@ -771,7 +808,8 @@ function renderBoard(){
       '<td><div class="pname">' + titreHtml + '<span class="dom ' + esc(domCls) + '">' +
         (p.domaine === 'pro' ? 'Jira ' + esc(p.jira) : esc(p.prefixe) + ' · ' + esc(p.domaine)) + '</span>' +
         '<span class="pmeta">' + prioProjetHtml(p) + volumeHtml(p) + '</span></div></td>' +
-      '<td class="date ' + (late ? 'late' : (p.echeance === '' ? 'none' : '')) + '">' + echHtml + '</td>' +
+      '<td class="date ' + (late ? 'late'
+        : (p.echeance === '' ? 'none' : (rp && rp.classe ? rp.classe : ''))) + '">' + echHtml + '</td>' +
       '<td class="next' + (!auto && p.prochaine_action === '' ? ' empty' : '') + '">' + nextHtml + '</td>' +
       '<td class="rowactions">' +
         '<button class="addtask-btn" type="button" data-quickadd="' + esc(p.id) + '" title="Ajouter une tâche">+</button>' +
@@ -801,26 +839,104 @@ function renderBoard(){
 }
 
 /* ============================ panneaux ============================ */
+// « Ma semaine » listait toutes les taches a echeance sous quatorze jours,
+// triees par date. C'etait un inventaire, pas une priorite : il ne disait pas
+// par quoi commencer. Il porte desormais le top 5 des projets a faire avancer
+// cette semaine, etabli par Claude a chaque ouverture, avec pour chacun la part
+// du travail qui peut lui etre sous-traitee.
+var semaine = null;          // {top, calculeLe} une fois la reponse arrivee
+var semaineEnCours = false;
+var semaineErreur = null;
+
 function renderWeek(){
-  var items = [];
-  etat.projects.forEach(function(p){
-    (p.taches || []).forEach(function(t){
-      if (t.responsable !== 'moi' || t.statut === 'fait' || t.statut === 'abandonne') return;
-      if (t.echeance === '' || daysBetween(t.echeance, etat.today) > 14) return;
-      items.push({p:p, t:t});
-    });
-  });
-  items.sort(function(a, b){ return D(a.t.echeance) - D(b.t.echeance); });
-  document.getElementById('wk').innerHTML = items.map(function(o){
-    var d = daysBetween(o.t.echeance, etat.today);
-    var cls = d < 0 ? 'late' : (o.t.nature_echeance === 'souhaitee' ? 'soft' : '');
-    var rel = d < 0 ? 'en retard' : (d === 0 ? "aujourd'hui" : 'J-' + d);
-    return '<li><span class="ref">' + esc(refOf(o.p, o.t)) + '</span>' +
-      '<span>' + esc(o.t.titre) + '</span>' +
-      '<span class="due ' + cls + '">' + frDate(o.t.echeance) + '</span>' +
-      '<span class="due ' + cls + '">' + rel + '</span></li>';
-  }).join('') || '<li><span></span><span class="hint">Rien sous 14 jours.</span><span></span><span></span></li>';
-  document.getElementById('wkCount').textContent = items.length + ' sous 14 jours';
+  var ul = document.getElementById('wk');
+  var compteur = document.getElementById('wkCount');
+
+  if (semaineEnCours) {
+    ul.innerHTML = '<li class="attente"><span class="hint">' +
+      'Claude établit ta semaine…</span></li>';
+    compteur.textContent = '';
+    return;
+  }
+  if (semaineErreur) {
+    ul.innerHTML = '<li class="attente"><span class="hint">' + esc(semaineErreur) + '</span></li>';
+    compteur.textContent = '';
+    return;
+  }
+  var top = (semaine && semaine.top) || [];
+  if (!top.length) {
+    ul.innerHTML = '<li class="attente"><span class="hint">' +
+      'Aucun projet à faire avancer : plus une seule tâche ouverte.</span></li>';
+    compteur.textContent = '';
+    return;
+  }
+
+  ul.innerHTML = top.map(function(x, i){
+    var p = projectById(x.projet);
+    // Le classement vient d'un calcul anterieur, garde tant que le portefeuille
+    // ne bouge pas : un projet supprime entre-temps ne doit pas faire tomber le
+    // panneau, il disparait simplement de la liste.
+    if (!p) return '';
+    var ech = '';
+    if (p.echeance !== '') {
+      var r = echeanceRelative(p.echeance, etat.today);
+      ech = '<span class="due ' + r.classe + '" title="' + esc(frDate(p.echeance)) + '">' +
+        esc(r.texte) + '</span>';
+    }
+    var pct = x.pourcentage_ia;
+    var jauge = pct === null || pct === undefined ? '' :
+      '<span class="ia" title="Part du travail restant délégable à l\'IA">' +
+        '<span class="jauge"><i style="width:' + pct + '%"></i></span>' +
+        '<b>' + pct + '%</b></span>';
+    return '<li data-goto="' + esc(p.id) + '">' +
+      '<span class="rang">' + (i + 1) + '</span>' +
+      '<span class="quoi"><b>' + esc(p.titre) + '</b>' +
+        (x.pourquoi ? '<span class="pourquoi">' + esc(x.pourquoi) + '</span>' : '') +
+      '</span>' + ech + jauge + '</li>';
+  }).join('');
+
+  compteur.textContent = semaine && semaine.calculeLe
+    ? 'établi à ' + new Date(semaine.calculeLe).toLocaleTimeString('fr-FR',
+        {hour: '2-digit', minute: '2-digit'}).replace(':', 'h')
+    : '';
+}
+
+// Un clic sur une ligne ouvre le projet concerne dans le portefeuille : la
+// semaine sert a decider, le portefeuille a agir, autant relier les deux.
+document.getElementById('wk').addEventListener('click', function(e){
+  var li = e.target.closest('[data-goto]');
+  if (!li) return;
+  var id = li.getAttribute('data-goto');
+  openProjects[id] = true;
+  renderAll();
+  var ligne = board.querySelector('tr.prow[data-pid="' + id.replace(/"/g, '') + '"]');
+  if (ligne && ligne.scrollIntoView) ligne.scrollIntoView({block: 'center'});
+});
+
+// Le calcul prend une trentaine de secondes quand le portefeuille a change : le
+// panneau affiche son attente au lieu de rester vide, et le reste du tableau de
+// bord ne l'attend pas.
+async function chargerSemaine(){
+  semaineEnCours = true;
+  semaineErreur = null;
+  renderWeek();
+  var data;
+  try {
+    var r = await fetch('/api/semaine');
+    data = await r.json();
+  } catch (e) {
+    semaineEnCours = false;
+    semaineErreur = 'Le serveur local ne répond pas.';
+    renderWeek();
+    return;
+  }
+  semaineEnCours = false;
+  if (data && data.erreur) {
+    semaineErreur = 'Claude n\'a pas pu établir la semaine. Vérifie la pastille Claude.';
+  } else {
+    semaine = data;
+  }
+  renderWeek();
 }
 
 var sentRelances = {};   /* ref -> true, seulement pour la session en cours */
@@ -2479,5 +2595,5 @@ async function lancerRapprochement(){
   else await etapeAjouts();
 }
 
-charger().then(lancerRapprochement);
+charger().then(function(){ chargerSemaine(); return lancerRapprochement(); });
 </script>

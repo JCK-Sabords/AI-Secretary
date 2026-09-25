@@ -9,6 +9,7 @@ const dictee = require('./dictee');
 const sante = require('./sante');
 const lancement = require('./lancement');
 const devinerProjet = require('./deviner-projet');
+const semaine = require('./semaine');
 
 function aujourdhui() {
   const d = new Date();
@@ -223,6 +224,19 @@ async function handle(req, body, ctx) {
       return {status: 200, json: {ok: true}};
     } catch (e) {
       return {status: 500, json: {erreur: 'etat du rapprochement non enregistre'}};
+    }
+  }
+
+  // Top 5 des projets de la semaine, etabli par Claude. Route separee de
+  // /api/etat parce qu'elle peut prendre une trentaine de secondes : le tableau
+  // de bord s'affiche sans elle et remplit le panneau a l'arrivee. Le resultat
+  // est garde tant que le portefeuille ne bouge pas, pour ne pas depenser un
+  // appel a chaque rechargement de page.
+  if (req.method === 'GET' && url === '/api/semaine') {
+    try {
+      return {status: 200, json: await semaine.calculer(ctx)};
+    } catch (e) {
+      return {status: 200, json: {top: [], erreur: 'classement indisponible'}};
     }
   }
 

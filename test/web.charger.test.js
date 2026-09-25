@@ -14,6 +14,19 @@ const path = require('node:path');
 // reellement : le chemin "reponse invalide" de charger() s'arrete avant
 // renderAll(), donc avant tout rendu de tableau complexe.
 
+// Retire l'appel de demarrage place a la fin du script. Sans cela, le simple
+// fait d'evaluer le fichier lance la sequence d'ouverture reelle (chargement de
+// l'etat, calcul de la semaine par Claude, rapprochement WhatsApp), qui continue
+// en tache de fond apres la fin du test, une fois le faux document retire :
+// l'activite asynchrone orpheline faisait alors echouer la suite. Ces tests
+// appellent charger() eux-memes, ils n'ont aucun besoin du demarrage.
+const MOTIF_DEMARRAGE = /\ncharger\(\)[\s\S]*?;\s*$/;
+function sansDemarrage(code) {
+  assert.match(code, MOTIF_DEMARRAGE,
+    'le script doit se terminer par son appel de demarrage');
+  return code.replace(MOTIF_DEMARRAGE, '\n');
+}
+
 function scriptInline() {
   const html = fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf8');
   const m = /<script>([\s\S]*)<\/script>/.exec(html);
@@ -102,7 +115,7 @@ function chargerPage(fetchImpl) {
   global.setTimeout = () => 0;
   global.clearTimeout = () => {};
   try {
-    const wrapped = new Function(code +
+    const wrapped = new Function(sansDemarrage(code) +
       '\nreturn {get etat(){ return etat; }, get erreurConnexion(){ return erreurConnexion; }, ' +
       'charger: charger};');
     const api = wrapped();
