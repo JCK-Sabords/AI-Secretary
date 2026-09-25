@@ -213,8 +213,11 @@ Toutes ecrivent dans les memes fichiers de `data/projects/` et `data/people.md`.
    precedente, et avec le portefeuille. Une premiere fenetre propose de retirer les taches dont
    la ligne a disparu d'un message au suivant, donc faites (« OK » retire, « Retablir » garde,
    et rien n'est ecrit avant ce clic). Une seconde propose d'ajouter les lignes qui ne
-   correspondent a aucune tache ouverte, chacune avec le projet devine par Claude, modifiable,
-   et un bouton `+` ; fermer la fenetre laisse de cote les lignes restantes. Le message traite
+   correspondent a aucune tache ouverte, chacune avec le projet devine par Claude, modifiable.
+   Cette seconde fenetre s'affiche immediatement, avant la reponse de Claude, et ses listes
+   deroulantes se remplissent quand elle arrive. Un bouton `+` ajoute une ligne, « Tout
+   ajouter » les ajoute toutes en une seule operation, et « Fermer sans ajouter le reste »
+   laisse de cote les lignes restantes. Le message traite
    est memorise dans `data/history/liste-whatsapp.json`, pour qu'une reponse donnee ne soit pas
    redemandee a l'ouverture suivante. Routes : `GET /api/lancement` (lecture seule),
    `POST /api/lancement/deviner`, `POST /api/lancement/cloturer` ; les ecritures elles-memes

@@ -493,3 +493,39 @@ comme un ordre restant un simple libelle de tache.
 
 La conversation se configure par `filTachesWhatsApp` dans `data/config.json`. Absente, le
 rapprochement est inactif et rien ne s'affiche.
+
+## Iteration 25 : la fenetre d'ajout ne jetait pas ce qu'elle proposait
+
+Correction d'un defaut trouve au premier vrai usage. La fenetre « Taches absentes du
+secretariat » listait sept lignes a ajouter, et l'utilisateur ne les a pas retrouvees dans le
+tableau de bord. Le depot de sauvegarde l'a confirme : aucune operation d'ajout n'avait jamais
+atteint le serveur.
+
+La cause n'etait pas un bug de code, le mecanisme fonctionnait. C'etait la fenetre elle-meme.
+Le seul bouton mis en avant, en couleur d'accent, etait « Fermer », c'est-a-dire celui qui
+abandonne tout. Les ajouts se faisaient par de petits boutons ronds de 22 pixels, un par ligne,
+colles au bord droit, et rien ne disait qu'il fallait les cliquer un par un. Le geste naturel,
+cliquer le gros bouton, jetait les sept lignes.
+
+Trois changements :
+
+- un bouton **« Tout ajouter (n) »** devient l'action mise en avant. Il envoie tous les ajouts
+  prets en une seule operation, donc une seule ecriture et une seule sauvegarde ;
+- le bouton d'abandon passe en bouton discret et dit ce qu'il fait : **« Fermer sans ajouter le
+  reste »** ;
+- le pied de fenetre affiche en permanence ce qui se joue : « 4 sur 7 pretes : les autres
+  attendent que tu choisisses un projet ».
+
+Second defaut trouve au passage, du meme ordre : **la fenetre mettait environ 45 secondes a
+s'afficher**. Elle attendait deux appels au binaire `claude` l'un apres l'autre, le controle
+d'ouverture puis le classement des lignes. Les deux partent desormais en parallele, et surtout
+la fenetre s'affiche immediatement, avec la mention « Claude cherche le projet de chaque ligne,
+tu peux deja choisir toi-meme ». Les listes deroulantes se remplissent a l'arrivee de la
+reponse, sans jamais ecraser un choix deja fait a la main ni une ligne deja ajoutee.
+
+Le comportement demande reste inchange : fermer la fenetre abandonne bien les lignes restantes.
+Ce qui change, c'est que ce choix est desormais explicite au lieu d'etre le geste par defaut.
+
+`test/web.ajouts.test.js` verrouille la lecon : le bouton qui abandonne ne doit jamais porter
+la classe `primary`, le pied doit toujours annoncer combien de lignes attendent, et le premier
+rendu doit preceder l'attente de Claude.

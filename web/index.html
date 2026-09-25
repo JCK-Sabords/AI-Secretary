@@ -2264,27 +2264,49 @@ async function etapeAjouts(){
   if (!rapprochement || !rapprochement.aAjouter.length) { await cloturerRapprochement(); return; }
   var lignes = rapprochement.aAjouter.map(function(x){ return x.ligne; });
 
-  // On attend la fin du controle d'ouverture de Claude. Son resultat n'est pas
-  // bloquant : s'il est injoignable, les lignes sont tout de meme proposees,
-  // simplement sans projet devine. Perdre la suggestion est acceptable, perdre
-  // les lignes ne l'est pas.
-  try { await claudeBranche; } catch (e) { /* controle en echec, on continue */ }
-
-  var data;
-  try {
-    var r = await fetch('/api/lancement/deviner', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({lignes: lignes})
-    });
-    data = await r.json();
-  } catch (e) {
-    data = null;
-  }
-  var propositions = (data && data.propositions) || lignes.map(function(l){
-    return {ligne: l, projetPropose: ''};
+  // Etat de la fenetre, tenu en memoire plutot que lu dans le DOM : chaque ligne
+  // porte son projet choisi et son sort. Le rendu en decoule entierement, ce qui
+  // evite de garder deux verites (l'affichage et la realite) qui divergent des
+  // qu'une ligne est ajoutee.
+  ajouts = lignes.map(function(l){
+    return {ligne: l, projet: '', ajoutee: false, choisiAlaMain: false};
   });
-  afficherAjouts(propositions, rapprochement.projets);
+  projetsAjouts = rapprochement.projets;
+
+  // La fenetre s'affiche immediatement, avant meme de savoir ce que Claude
+  // proposera. Dans la premiere version elle attendait deux appels au binaire
+  // claude, l'un apres l'autre (le controle d'ouverture, puis le classement),
+  // soit pres d'une minute d'ecran vide pendant laquelle rien n'indiquait
+  // qu'une fenetre allait s'ouvrir. Les deux appels partent desormais en
+  // parallele, et les listes deroulantes se remplissent quand la reponse
+  // arrive : l'utilisateur peut choisir un projet a la main sans rien attendre.
+  devinageEnCours = true;
+  rendreAjouts();
+
+  var promesseDeviner = fetch('/api/lancement/deviner', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({lignes: lignes})
+  }).then(function(r){ return r.json(); }).catch(function(){ return null; });
+
+  // Le controle d'ouverture de Claude reste attendu, comme demande : la fenetre
+  // ne propose pas de rattachement devine avant que Claude soit joignable. Son
+  // echec n'est pas bloquant pour autant, les lignes restent proposees sans
+  // projet pre-selectionne. Perdre la suggestion est acceptable, perdre les
+  // lignes ne l'est pas.
+  try { await claudeBranche; } catch (e) { /* controle en echec, on continue */ }
+  var data = await promesseDeviner;
+
+  devinageEnCours = false;
+  var propositions = (data && data.propositions) || [];
+  propositions.forEach(function(p, i){
+    // Une reponse tardive de Claude n'ecrase jamais un choix deja fait a la
+    // main, ni une ligne deja ajoutee pendant l'attente.
+    if (!ajouts[i] || ajouts[i].ajoutee || ajouts[i].choisiAlaMain) return;
+    ajouts[i].projet = p.projetPropose || '';
+  });
+  // La fenetre a pu etre fermee pendant l'attente : on ne la fait pas revenir.
+  if (modalHost.innerHTML !== '') rendreAjouts();
 }
 
 function optionsProjets(projets, choisi){
@@ -2294,54 +2316,130 @@ function optionsProjets(projets, choisi){
   }).join('');
 }
 
-function afficherAjouts(propositions, projets){
-  var corps = '<ul class="rapp">' + propositions.map(function(x, i){
+var ajouts = [];
+var projetsAjouts = [];
+var devinageEnCours = false;
+
+function ajoutsEnAttente(){
+  return ajouts.filter(function(a){ return !a.ajoutee; });
+}
+function ajoutsPrets(){
+  return ajouts.filter(function(a){ return !a.ajoutee && a.projet !== ''; });
+}
+
+// Le pied de fenetre a ete refait apres un vrai usage. Dans la premiere version,
+// le seul bouton mis en avant etait « Fermer », qui abandonne tout : c'est donc
+// celui sur lequel on clique naturellement, et les lignes proposees partaient a
+// la poubelle sans que rien ne le laisse prevoir. Desormais l'action mise en
+// avant est celle qui ajoute, l'abandon est un bouton discret qui dit ce qu'il
+// fait, et le decompte rappelle en permanence ce qui se joue.
+// Phrase du pied de fenetre. Isolee et pure pour etre verifiable : elle porte
+// ce que l'utilisateur lit avant de decider, donc ce qui a manque la premiere
+// fois. Elle doit toujours dire combien de lignes attendent encore, sans quoi
+// fermer la fenetre revient a jeter du travail sans le savoir.
+function libelleCompteAjouts(enAttente, prets, devinageEnCours){
+  if (devinageEnCours) {
+    return 'Claude cherche le projet de chaque ligne. Tu peux déjà choisir toi-même.';
+  }
+  if (enAttente === 0) return 'Tout est ajouté.';
+  if (prets === enAttente) {
+    return enAttente + (enAttente === 1
+      ? ' tâche prête à être ajoutée.' : ' tâches prêtes à être ajoutées.');
+  }
+  return prets + ' sur ' + enAttente +
+    ' prêtes : les autres attendent que tu choisisses un projet.';
+}
+
+function rendreAjouts(){
+  var attente = ajoutsEnAttente();
+  var prets = ajoutsPrets();
+
+  var corps = '<ul class="rapp">' + ajouts.map(function(a, i){
+    if (a.ajoutee) {
+      return '<li data-rapp-ligne="' + i + '">' +
+        '<span class="lib"><b>' + esc(a.ligne) + '</b></span>' +
+        '<span class="fait">ajoutée</span></li>';
+    }
     return '<li data-rapp-ligne="' + i + '">' +
-      '<span class="lib"><b>' + esc(x.ligne) + '</b></span>' +
+      '<span class="lib"><b>' + esc(a.ligne) + '</b></span>' +
       '<select data-rapp-projet="' + i + '">' +
-        optionsProjets(projets, x.projetPropose) + '</select>' +
+        optionsProjets(projetsAjouts, a.projet) + '</select>' +
       '<button class="iconbtn round" type="button" data-rapp-ajouter="' + i +
-        '" title="Ajouter cette tâche au projet">+</button>' +
+        '" title="Ajouter cette tâche au projet choisi">+</button>' +
     '</li>';
   }).join('') + '</ul>';
-  var pied =
-    '<span class="pousse">Les lignes laissées ici ne seront pas ajoutées.</span>' +
-    '<button class="btn primary" type="button" data-rapp-fermer>Fermer</button>';
+
+  var compte = libelleCompteAjouts(attente.length, prets.length, devinageEnCours);
+
+  var pied = '<span class="pousse">' + esc(compte) + '</span>' +
+    '<button class="btn" type="button" data-rapp-fermer>' +
+      (attente.length === 0 ? 'Fermer' : 'Fermer sans ajouter le reste') + '</button>' +
+    (prets.length
+      ? '<button class="btn primary" type="button" data-rapp-tout>Tout ajouter (' +
+          prets.length + ')</button>'
+      : '');
+
   modalHost.innerHTML = modaleHtml(
     'Tâches absentes du secrétariat',
     'Ces lignes de ta liste WhatsApp ne correspondent à aucune tâche ouverte. ' +
-      'Le projet est deviné, corrige-le si besoin, puis ajoute.',
+      'Le projet est deviné par Claude, corrige-le si besoin, puis ajoute. ' +
+      'Rien n\'est ajouté tant que tu ne cliques pas.',
     corps, pied);
-  modalHost.setAttribute('data-lignes', JSON.stringify(
-    propositions.map(function(x){ return x.ligne; })));
+}
+
+// Un changement de projet dans une liste deroulante est retenu tout de suite :
+// sans cela, le decompte du pied et « Tout ajouter » raisonneraient sur les
+// propositions de Claude et non sur les choix reels.
+function choisirProjetAjout(index, valeur){
+  if (!ajouts[index] || ajouts[index].ajoutee) return;
+  ajouts[index].projet = valeur;
+  ajouts[index].choisiAlaMain = true;
+  rendreAjouts();
+}
+
+// Envoie les ajouts demandes en une seule operation, donc une seule ecriture et
+// une seule sauvegarde. Les lignes refusees restent dans la fenetre, avec leur
+// projet, pour un second essai.
+async function envoyerAjouts(indices) {
+  var cibles = indices.filter(function(i){
+    return ajouts[i] && !ajouts[i].ajoutee && ajouts[i].projet !== '';
+  });
+  if (!cibles.length) return;
+
+  var data = await envoyerOps(cibles.map(function(i){
+    return {op: 'add_task', projet: ajouts[i].projet, titre: ajouts[i].ligne};
+  }));
+
+  // On ne marque comme ajoutees que si le serveur a bien applique autant
+  // d'operations qu'on en a envoyees. Un refus partiel laisse tout en attente
+  // plutot que de faire croire a un ajout qui n'a pas eu lieu : envoyerOps a
+  // deja affiche la raison du refus.
+  if (data && data.applied && data.applied.length === cibles.length) {
+    cibles.forEach(function(i){ ajouts[i].ajoutee = true; });
+  }
+  rendreAjouts();
 }
 
 async function ajouterLigne(index){
-  var li = modalHost.querySelector('[data-rapp-ligne="' + index + '"]');
-  if (!li) return;
-  var select = li.querySelector('[data-rapp-projet]');
-  var projet = select ? select.value : '';
-  if (!projet) { toast('Choisis un projet pour cette tâche.'); if (select) select.focus(); return; }
-  var lignes = JSON.parse(modalHost.getAttribute('data-lignes') || '[]');
-  var titre = lignes[index];
-  if (!titre) return;
-
-  var bouton = li.querySelector('[data-rapp-ajouter]');
-  if (bouton) bouton.disabled = true;
-  var avant = etat.projects.length;
-  var data = await envoyerOps([{op: 'add_task', projet: projet, titre: titre}]);
-  // envoyerOps a deja signale l'echec et recharge l'etat : on ne retire la ligne
-  // de la fenetre que si l'operation a bien ete appliquee, sinon elle reste
-  // disponible pour un second essai avec un autre projet.
-  if (data && data.applied && data.applied.length) {
-    li.innerHTML = '<span class="lib"><b>' + esc(titre) + '</b></span>' +
-      '<span class="fait">ajoutée</span>';
-  } else if (bouton) {
-    bouton.disabled = false;
+  if (!ajouts[index]) return;
+  if (ajouts[index].projet === '') {
+    toast('Choisis un projet pour cette tâche.');
+    var sel = modalHost.querySelector('[data-rapp-projet="' + index + '"]');
+    if (sel) sel.focus();
+    return;
   }
+  await envoyerAjouts([index]);
+}
+
+async function ajouterTout(){
+  await envoyerAjouts(ajouts.map(function(a, i){ return i; }));
 }
 
 /* ---------- enchainement ---------- */
+modalHost.addEventListener('change', function(e){
+  var sel = e.target.closest('[data-rapp-projet]');
+  if (sel) choisirProjetAjout(Number(sel.getAttribute('data-rapp-projet')), sel.value);
+});
 modalHost.addEventListener('click', function(e){
   var el;
   if ((el = e.target.closest('[data-rapp-ok]'))) { validerRetraits(); return; }
@@ -2350,6 +2448,7 @@ modalHost.addEventListener('click', function(e){
     ajouterLigne(Number(el.getAttribute('data-rapp-ajouter')));
     return;
   }
+  if ((el = e.target.closest('[data-rapp-tout]'))) { ajouterTout(); return; }
   if ((el = e.target.closest('[data-rapp-fermer]'))) {
     fermerModale();
     cloturerRapprochement();
