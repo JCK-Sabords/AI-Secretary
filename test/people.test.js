@@ -161,10 +161,83 @@ test('relancesBloquees ne produit rien pour une fiche resolue, qui produit bien 
   assert.strictEqual(people.relances(projets, annuaire(), AUJ).length, 1);
 });
 
-test('relancesBloquees ignore une tache dont la date de relance n est pas atteinte', () => {
+// Asymetrie assumee : un contact non resolu est une action a mener tout de
+// suite. Le signaler seulement le jour de l'echeance ferait decouvrir le
+// probleme au moment precis ou l'on comptait envoyer.
+test('relancesBloquees signale un contact non resolu avant meme la date de relance', () => {
   const projets = projetAvecDelegue({responsable: 'inconnu', prochaine_relance: '2026-09-20'});
-  assert.strictEqual(people.relancesBloquees(projets, annuaire(), AUJ).length, 0);
+  const b = people.relancesBloquees(projets, annuaire(), AUJ);
+  assert.strictEqual(b.length, 1);
+  assert.strictEqual(b[0].raison, 'contact_inconnu');
+  // Elle n'est ni envoyable ni programmee : son contact n'existe pas.
   assert.strictEqual(people.relances(projets, annuaire(), AUJ).length, 0);
+  assert.strictEqual(people.relancesAVenir(projets, annuaire(), AUJ).length, 0);
+});
+
+/* ---------- relances programmees ---------- */
+
+// Le silence signale par l'utilisateur : une tache deleguee, datee, au contact
+// resolu, n'apparaissait nulle part jusqu'au jour dit. Rien ne distinguait
+// « programmee » de « oubliee ».
+test('relancesAVenir rend les relances pretes mais pas encore dues', () => {
+  const projets = projetAvecDelegue({prochaine_relance: '2026-09-20'});
+  const a = people.relancesAVenir(projets, annuaire(), AUJ);
+  assert.strictEqual(a.length, 1);
+  assert.strictEqual(a[0].prochaine_relance, '2026-09-20');
+  assert.ok(a[0].dansJours > 0, 'le delai restant doit etre positif');
+  assert.ok(a[0].texte, 'le brouillon est deja pret');
+});
+
+// Une relance est dans une liste ou dans l'autre, jamais dans les deux.
+test('relancesAVenir et relances ne se recouvrent jamais', () => {
+  const due = projetAvecDelegue({prochaine_relance: AUJ});
+  assert.strictEqual(people.relances(due, annuaire(), AUJ).length, 1);
+  assert.strictEqual(people.relancesAVenir(due, annuaire(), AUJ).length, 0);
+
+  const aVenir = projetAvecDelegue({prochaine_relance: '2026-09-20'});
+  assert.strictEqual(people.relances(aVenir, annuaire(), AUJ).length, 0);
+  assert.strictEqual(people.relancesAVenir(aVenir, annuaire(), AUJ).length, 1);
+});
+
+test('relancesAVenir ignore une tache sans date de relance', () => {
+  const projets = projetAvecDelegue({prochaine_relance: ''});
+  assert.strictEqual(people.relancesAVenir(projets, annuaire(), AUJ).length, 0);
+});
+
+/* ---------- redaction du brouillon ---------- */
+
+// « M. BAREC agent Immo » donnait « Salut M. ».
+test('nomAppel saute un titre de civilite', () => {
+  assert.strictEqual(people.nomAppel('M. BAREC agent Immo'), 'BAREC');
+  assert.strictEqual(people.nomAppel('Mme Dupont'), 'Dupont');
+  assert.strictEqual(people.nomAppel('Dr. House'), 'House');
+  assert.strictEqual(people.nomAppel('Christian Kourajian'), 'Christian');
+});
+
+test('nomAppel ne rend jamais une salutation vide', () => {
+  assert.strictEqual(people.nomAppel('M.'), 'M.');
+  assert.strictEqual(people.nomAppel(''), '');
+  assert.strictEqual(people.nomAppel('   '), '');
+  assert.strictEqual(people.nomAppel(null), '');
+});
+
+// Un brouillon part au nom du proprietaire : une date au format machine dedans
+// se remarque.
+test('dateFr ecrit la date en francais, jamais au format machine', () => {
+  assert.strictEqual(people.dateFr('2026-10-05'), '5 oct.');
+  assert.strictEqual(people.dateFr('2026-01-09'), '9 janv.');
+  assert.strictEqual(people.dateFr(''), '');
+  assert.strictEqual(people.dateFr('pas une date'), 'pas une date');
+});
+
+test('le brouillon ne contient ni date machine ni anciennete vide de sens', () => {
+  const projets = projetAvecDelegue({prochaine_relance: AUJ, echeance: '2026-10-05'});
+  const texte = people.relances(projets, annuaire(), AUJ)[0].texte;
+  assert.ok(!texte.includes('2026-10-05'), 'la date doit etre en francais');
+  assert.match(texte, /5 oct\./);
+  assert.ok(!texte.includes('il y a 0 jours'));
+  assert.ok(!texte.includes('depuis 0 jours'));
+  assert.ok(!texte.includes('depuis 1 jours'));
 });
 
 test('relancesBloquees ignore une tache dont le responsable est moi', () => {
@@ -193,11 +266,13 @@ test('relances et relancesBloquees sont exactement complementaires sur un portef
       {n: 3, titre: 'c', responsable: 'sans-chat', echeance: '',
         nature_echeance: 'souhaitee', prio: 'P2', effort: 'M', bloque_par: '',
         derniere_relance: '', prochaine_relance: AUJ, maj_le: '2026-08-01', note_blocage: ''},
-      // pas encore due : ni l'une ni l'autre
+      // pas encore due, mais responsable absent du repertoire : bloquee des
+      // maintenant, parce que resoudre le contact est une action a mener avant
+      // la date, pas le jour dit
       {n: 4, titre: 'd', responsable: 'inconnu', echeance: '',
         nature_echeance: 'souhaitee', prio: 'P2', effort: 'M', bloque_par: '',
         derniere_relance: '', prochaine_relance: '2026-09-20', maj_le: '2026-08-01', note_blocage: ''},
-      // responsable inconnu du repertoire : bloquee, comme ES2 et ES4
+      // due, responsable inconnu : bloquee, comme ES2
       {n: 5, titre: 'e', responsable: 'inconnu', echeance: '',
         nature_echeance: 'souhaitee', prio: 'P2', effort: 'M', bloque_par: '',
         derniere_relance: '', prochaine_relance: AUJ, maj_le: '2026-08-01', note_blocage: ''},
@@ -213,12 +288,20 @@ test('relances et relancesBloquees sont exactement complementaires sur un portef
   const refsBloquees = bloquees.map((b) => b.ref).sort();
   // aucune tache dans les deux listes
   assert.deepStrictEqual(refsRelances.filter((r) => refsBloquees.includes(r)), []);
-  const tachesDelegueesDues = projets[0].taches.filter((t) =>
-    t.responsable !== 'moi' && t.prochaine_relance && t.prochaine_relance <= AUJ).length;
-  assert.strictEqual(relancesDues.length + bloquees.length, tachesDelegueesDues);
+  // La complementarite se verifie sur les taches dont la relance est due : une
+  // tache due tombe toujours dans l'une des deux listes, jamais dans les deux,
+  // jamais dans aucune. Les bloquees peuvent en plus porter des taches pas
+  // encore dues, dont le contact est a resoudre des maintenant.
+  const dues = projets[0].taches.filter((t) =>
+    t.responsable !== 'moi' && t.prochaine_relance && t.prochaine_relance <= AUJ)
+    .map((t) => 'ES' + t.n);
+  const couvertes = refsRelances.concat(refsBloquees);
+  dues.forEach((ref) => {
+    assert.strictEqual(couvertes.filter((r) => r === ref).length, 1,
+      ref + ' doit apparaitre dans exactement une des deux listes');
+  });
   assert.strictEqual(relancesDues.length, 1);
-  assert.strictEqual(bloquees.length, 3);
-  assert.deepStrictEqual(refsBloquees, ['ES2', 'ES3', 'ES5']);
+  assert.deepStrictEqual(refsBloquees, ['ES2', 'ES3', 'ES4', 'ES5']);
 });
 
 test('loadPeopleSafe garde la premiere occurrence en cas de doublon d id et le signale', () => {

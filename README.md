@@ -314,6 +314,13 @@ Toutes ecrivent dans les memes fichiers de `data/projects/` et `data/people.md`.
    elle, on ne pouvait deleguer qu'aux personnes deja presentes. La recherche ne montre chaque
    contact qu'une fois, Beeper renvoyant la meme personne sous deux formes d'identifiant.
 
+   Le panneau « Relances a valider » porte trois listes. Les **bloquees** d'abord, qui
+   demandent de resoudre un contact, signalees des que le responsable est designe et sans
+   attendre la date. Les **dues** ensuite, relisibles et envoyables. Les **programmees** enfin,
+   en retrait : tout est pret, la date n'est pas encore atteinte, et un bouton « Relancer
+   maintenant » permet de ne pas l'attendre. Sans cette troisieme liste, une tache deleguee
+   correctement preparee n'apparaissait nulle part jusqu'au jour dit.
+
    Une tache deleguee (`responsable` different de `moi`) porte deux champs de relance,
    « Derniere relance » et « Prochaine relance », visibles uniquement pour ce cas (masques des
    la selection de `moi`, sans recharger le formulaire) ; un bouton « Dans une semaine » pose

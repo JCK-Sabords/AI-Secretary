@@ -65,6 +65,7 @@ function etat(ctx) {
     errors: errors.concat(errorsPeople).concat(errorsCalcul),
     people: gens,
     relances: people.relances(projects, gens, today),
+    relancesAVenir: people.relancesAVenir(projects, gens, today),
     relancesBloquees: people.relancesBloquees(projects, gens, today),
     projects: projetsEnrichis
   };

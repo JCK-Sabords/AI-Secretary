@@ -266,6 +266,12 @@ td.date.none{color:var(--muted)}
 .prio.p3{color:var(--ink-2);font-weight:400}
 .prio.p4{color:var(--muted);font-weight:400;opacity:.7}
 .blocked-note{grid-column:1/-1;font-size:13px;color:var(--crit);padding:6px 8px 0}
+/* Relance programmee : elle n'appelle aucune action, elle rassure. En retrait
+   donc, mais lisible, avec sa date et son delai. */
+.item.avenir{opacity:.72}
+.item.avenir .quand{font-family:var(--mono);font-size:11px;color:var(--muted);
+  letter-spacing:.04em}
+.item.avenir:hover{opacity:1}
 .tasks .foot{display:flex;gap:8px;padding-top:14px}
 .empty-tasks{padding:16px 8px;color:var(--muted);font-size:13px}
 
@@ -1108,24 +1114,58 @@ function relanceHtml(r){
           : '<div><button class="btn" type="button" data-open="' + esc(r.ref) + '">Relire et envoyer</button></div>') +
   '</div>';
 }
+// Une relance se retrouve dans les dues comme dans les programmees : le bouton
+// « Relancer maintenant » ouvre le meme brouillon avant la date prevue, et
+// l'envoi emprunte ensuite exactement le meme chemin.
+function relanceParRef(ref){
+  var toutes = (etat.relances || []).concat(etat.relancesAVenir || []);
+  return toutes.filter(function(x){ return x.ref === ref; })[0];
+}
+
+// Une relance correctement preparee mais pas encore due n'apparaissait nulle
+// part : on avait renseigne un responsable et une date, et on obtenait le
+// silence, sans pouvoir distinguer « programmee » d'« oubliee ». Elle figure
+// desormais sous les autres, en retrait, avec sa date et son delai, et un bouton
+// pour l'envoyer avant l'heure si on le decide.
+function aVenirHtml(r){
+  var quand = r.dansJours === 1 ? 'demain' : 'dans ' + r.dansJours + ' j';
+  return '<div class="item avenir">' +
+    '<div class="who"><span class="av">' + esc(iniOf(r.personne.nom)) + '</span>' +
+      '<div><b>' + esc(r.personne.nom) + '</b>' +
+        '<span class="route">' + esc(r.ref) + ' · ' + esc(r.tacheTitre) + '</span></div></div>' +
+    '<div class="quand">prévue le ' + esc(frDate(r.prochaine_relance)) +
+      ', ' + esc(quand) + '</div>' +
+    '<div><button class="btn ghost" type="button" data-relance-avant="' + esc(r.ref) +
+      '" title="Ouvrir le brouillon sans attendre la date prévue">Relancer maintenant</button></div>' +
+    '</div>';
+}
+
 function renderRelances(){
   var bloquees = etat.relancesBloquees || [];
   var list = etat.relances || [];
+  var aVenir = etat.relancesAVenir || [];
   // Les bloquees d'abord : elles demandent une action (resoudre un contact)
-  // avant qu'une relance puisse meme etre relue.
-  document.getElementById('rl').innerHTML =
-    bloquees.map(bloqueeHtml).join('') + list.map(relanceHtml).join('') ||
-    '<div class="item"><span class="hint">Aucune relance due.</span></div>';
+  // avant qu'une relance puisse meme etre relue. Les a venir en dernier : elles
+  // n'appellent aucune action, elles rassurent.
+  var corps = bloquees.map(bloqueeHtml).join('') + list.map(relanceHtml).join('');
+  if (!corps && !aVenir.length) {
+    corps = '<div class="item"><span class="hint">Aucune relance due.</span></div>';
+  }
+  document.getElementById('rl').innerHTML = corps + aVenir.map(aVenirHtml).join('');
+
   var waiting = list.filter(function(r){ return !sentRelances[r.ref]; }).length;
   // Le compteur ne doit jamais annoncer que tout est parti tant qu'il reste des
   // bloquees : rien n'est parti pour elles, l'envoi n'a meme pas pu etre prepare.
   var texte;
   if (waiting === 0 && bloquees.length === 0) {
-    texte = 'tout est parti';
+    texte = aVenir.length
+      ? aVenir.length + (aVenir.length > 1 ? ' programmées' : ' programmée')
+      : 'tout est parti';
   } else {
     var morceaux = [];
     if (waiting) morceaux.push(waiting + ' en attente');
     if (bloquees.length) morceaux.push(bloquees.length + (bloquees.length > 1 ? ' bloquées' : ' bloquée'));
+    if (aVenir.length) morceaux.push(aVenir.length + ' programmées');
     texte = morceaux.join(' · ');
   }
   document.getElementById('rlCount').textContent = texte;
@@ -1191,7 +1231,7 @@ function renderAll(){
 /* ============================ tiroir relance ============================ */
 var drawerHost = document.getElementById('drawerHost');
 function openDrawer(ref){
-  var r = (etat.relances || []).filter(function(x){ return x.ref === ref; })[0];
+  var r = relanceParRef(ref);
   if (!r) return;
   drawerHost.innerHTML =
     '<div class="scrim" data-close></div>' +
@@ -1748,7 +1788,7 @@ if (typeof window !== 'undefined' && window.addEventListener) {
 }
 
 async function envoyerRelance(ref, btn){
-  var r = (etat.relances || []).filter(function(x){ return x.ref === ref; })[0];
+  var r = relanceParRef(ref);
   if (!r) return;
   var texteEl = drawerHost.querySelector('#msg');
   var texte = texteEl ? texteEl.value : r.texte;
@@ -1867,6 +1907,10 @@ document.addEventListener('click', function(e){
   var el;
 
   if ((el = e.target.closest('[data-open]'))) { openDrawer(el.getAttribute('data-open')); return; }
+  if ((el = e.target.closest('[data-relance-avant]'))) {
+    openDrawer(el.getAttribute('data-relance-avant'));
+    return;
+  }
   if (e.target.closest('[data-close]')) { closeDrawer(); return; }
 
   if ((el = e.target.closest('[data-send]'))) {

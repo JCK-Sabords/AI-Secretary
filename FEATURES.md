@@ -867,3 +867,36 @@ nom : deux homonymes sans numero de telephone sont deux personnes differentes.
 Verifie de bout en bout sur une copie des donnees : recherche d'un contact WhatsApp reel,
 creation de la fiche, assignation de la tache, et la relance quitte les bloquees pour les
 validables avec un brouillon nominatif.
+
+## Iteration 35 : les relances programmees se voient
+
+Signale par l'utilisateur : une tache deleguee, datee, au contact resolu, n'apparaissait pas
+dans « Relances a valider ».
+
+Rien n'etait casse. Le panneau ne montrait que les relances **dues**, et celles-la etaient
+programmees pour le 2 octobre, cinq jours plus tard. Mais rien ne le disait : on renseignait un
+responsable et une date, et on obtenait le silence, sans pouvoir distinguer « programmee » de
+« oubliee ». C'est ce silence qui etait le defaut, pas la regle.
+
+Le panneau porte desormais les relances a venir sous les autres, en retrait, avec leur date et
+le delai restant, et un bouton « Relancer maintenant » qui ouvre le meme brouillon avant
+l'heure. Le compteur les annonce (« 2 programmees ») au lieu de dire « tout est parti ».
+
+**Un contact non resolu est signale sans attendre la date.** Seule asymetrie assumee entre les
+listes : resoudre un contact est une action a mener tout de suite, et la decouvrir le jour ou
+l'on comptait envoyer serait trop tard. Sur les taches dont la relance est due, les listes
+restent exactement complementaires.
+
+### Trois defauts du brouillon, vus en ouvrant un vrai message
+
+Le brouillon destine a un agent immobilier disait « Salut M. », « d'ici le 2026-10-05 » et
+« cale il y a 0 jours ».
+
+- le nom d'appel saute les titres de civilite : « M. BAREC agent Immo » donne « BAREC » ;
+- la date s'ecrit en francais, « 5 oct. ». Un brouillon part au nom du proprietaire, une date
+  au format machine dedans se remarque ;
+- l'anciennete n'est mentionnee qu'au-dela de deux jours. « Cale il y a 0 jours » sur une tache
+  creee le matin meme n'apprend rien et sonne faux.
+
+Reste ouvert, parce que c'est une decision de ton et non un defaut : le brouillon tutoie tout
+le monde. Cela convient a un frere, moins a un agent immobilier.
