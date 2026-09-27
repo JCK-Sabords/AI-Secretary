@@ -687,3 +687,33 @@ plus, les plus recents) et servent d'alias, ce qui rend la reconnaissance exacte
 Le tout tourne sous la tache planifiee `Secretariat - liste WhatsApp`, toutes les heures.
 `npm run publier-liste` fait la meme chose a la demande, et `GET /api/liste-sortante` montre le
 message sans rien envoyer.
+
+## Iteration 30 : le lanceur redemarre le serveur quand le code a change
+
+Panne silencieuse trouvee en usage reel. Le tableau de bord proposait d'ajouter sept taches
+dont six existaient deja, alors que le correctif de l'iteration precedente etait sur le disque
+depuis plusieurs minutes et que les tests passaient.
+
+La cause n'etait pas dans le code : **Node charge ses modules une fois pour toutes au
+demarrage**. Le serveur lance avant la correction continuait d'executer l'ancienne version, et
+rien ne le signalait. Un processus neuf ne proposait qu'une seule tache, le serveur en cours
+d'execution en proposait sept : c'est cette comparaison qui a tranche.
+
+Le piege etait durable. `demarrer.cmd` reutilise deliberement un serveur qui repond deja, donc
+relancer le raccourci apres une mise a jour ne changeait rien, et rien n'indiquait qu'il
+fallait arreter puis relancer.
+
+`GET /api/version` expose desormais l'instant de demarrage du processus. Le lanceur le compare
+a la date de modification la plus recente parmi `server/**.js`, `web/**.js`, `outils/**.js` et
+`web/*.html` : si le code est plus recent, il arrete le serveur par son port et en relance un.
+En cas de doute (reponse illisible, date inexploitable), il ne redemarre pas : interrompre un
+serveur qui fonctionne serait pire que de laisser l'utilisateur relancer lui-meme.
+
+Trois situations verifiees a la main : serveur a jour, il est reutilise et garde son
+identifiant de processus ; code modifie, il est arrete et relance sous un nouvel identifiant ;
+port libre, demarrage normal.
+
+Au passage, les trois attentes des scripts `.cmd` n'utilisent plus `timeout.exe`, qui refuse de
+s'executer des que l'entree standard est redirigee, c'est-a-dire des que le script est lance
+autrement que par un double-clic. Elles passent par `Start-Sleep`, dans le meme appel
+PowerShell que l'action qui les precede quand il y en a un.

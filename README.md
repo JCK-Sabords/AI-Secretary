@@ -107,6 +107,12 @@ Puis ouvrir `http://127.0.0.1:5556`. Le serveur n'ecoute que sur `127.0.0.1`.
 
 ## Le raccourci
 
+Le lanceur reutilise un serveur qui repond deja, sauf si le code a change depuis son
+demarrage : il compare alors l'instant renvoye par `GET /api/version` a la date de
+modification des fichiers source, et redemarre le serveur. Node chargeant ses modules une
+fois pour toutes, un serveur lance avant une mise a jour continuerait sinon d'executer
+l'ancienne version sans que rien ne le signale.
+
 Un raccourci Bureau nomme « Secretariat particulier » (pointant sur `demarrer.cmd`, a la racine
 du depot) fait les quatre choses suivantes en un double-clic : il verifie l'etat du port 5556 en
 interrogeant `/api/etat` et en cherchant la cle `today` dans la reponse (une simple connexion

@@ -12,6 +12,9 @@ const devinerProjet = require('./deviner-projet');
 const semaine = require('./semaine');
 const listeSortante = require('./liste-sortante');
 
+// Fige l'instant ou ce module a ete charge, donc le demarrage du processus.
+const DEMARRE_LE = new Date().toISOString();
+
 function aujourdhui() {
   const d = new Date();
   const p = (n) => String(n).padStart(2, '0');
@@ -243,6 +246,14 @@ async function handle(req, body, ctx) {
 
   // Liste a publier dans la conversation a soi-meme : ce que le message
   // contiendrait, sans rien envoyer. Permet de la relire avant publication.
+  // Instant de demarrage du processus. Node charge les modules une fois pour
+  // toutes : un serveur lance avant une modification du code continue d'en
+  // executer l'ancienne version, sans que rien ne le signale. Le lanceur compare
+  // cette date a celle des fichiers source pour decider de redemarrer.
+  if (req.method === 'GET' && url === '/api/version') {
+    return {status: 200, json: {demarreLe: DEMARRE_LE}};
+  }
+
   if (req.method === 'GET' && url === '/api/liste-sortante') {
     try {
       const prep = await listeSortante.preparer(ctx);

@@ -40,11 +40,28 @@ set "TITRE=Secretariat particulier"
 set "JOURNAL=%~dp0data\history\serveur.log"
 
 call :verifierEtat
-if %errorlevel%==0 (
-  echo Le serveur repond deja sur le port %PORT%.
-  goto ouvrir
-)
 if %errorlevel%==2 goto occupe
+if %errorlevel%==0 goto dejaLa
+goto lancer
+
+rem Notre serveur repond deja. Reste a savoir s il execute bien le code present
+rem sur le disque : Node charge ses modules une fois pour toutes au demarrage,
+rem donc un serveur lance avant une modification continue d executer l ancienne
+rem version sans que rien ne le signale. C est une panne silencieuse, et elle a
+rem deja trompe l utilisateur : le tableau de bord proposait d ajouter des taches
+rem qui existaient deja, alors que le correctif etait sur le disque depuis
+rem plusieurs minutes.
+:dejaLa
+call :codeModifieDepuisDemarrage
+if %errorlevel%==1 (
+  echo Le code a change depuis le demarrage du serveur, redemarrage...
+  call :arreterServeur
+  goto lancer
+)
+echo Le serveur repond deja sur le port %PORT%.
+goto ouvrir
+
+:lancer
 
 echo Demarrage du serveur local...
 if not exist "%~dp0data\history" mkdir "%~dp0data\history" >nul 2>&1
@@ -52,7 +69,9 @@ powershell -NoProfile -Command "Start-Process -FilePath 'node' -ArgumentList 'se
 
 set /a tentatives=0
 :attendre
-"%SystemRoot%\System32\timeout.exe" /t 1 /nobreak >nul
+rem Meme raison que dans :arreterServeur : timeout.exe refuse de s executer
+rem quand l entree standard est redirigee.
+powershell -NoProfile -Command "Start-Sleep -Seconds 1"
 call :verifierEtat
 if %errorlevel%==0 goto ouvrir
 if %errorlevel%==2 goto occupe
@@ -85,6 +104,23 @@ echo  - que le port %PORT% n'est pas deja occupe par un autre programme.
 echo.
 pause
 exit /b 1
+
+rem Sous-routine : vrai (errorlevel 1) si un fichier source est plus recent que
+rem l instant de demarrage du serveur, que /api/version renvoie. En cas de doute
+rem (reponse illisible, date inexploitable) on ne redemarre pas : interrompre un
+rem serveur qui fonctionne serait pire que de laisser l utilisateur relancer.
+:codeModifieDepuisDemarrage
+powershell -NoProfile -Command "try { $v = Invoke-RestMethod -Uri 'http://127.0.0.1:%PORT%/api/version' -TimeoutSec 3; $d = [datetime]::Parse($v.demarreLe).ToUniversalTime(); $f = Get-ChildItem -Path 'server','web','outils' -Filter *.js -Recurse -ErrorAction SilentlyContinue; $f += Get-ChildItem -Path 'web' -Filter *.html -ErrorAction SilentlyContinue; $r = $f | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1; if ($r -and $r.LastWriteTimeUtc -gt $d) { exit 1 } else { exit 0 } } catch { exit 0 }"
+exit /b %errorlevel%
+
+rem Sous-routine : arrete le serveur qui ecoute sur le port, par le port et
+rem jamais par le nom du processus, comme arreter.cmd.
+:arreterServeur
+rem L attente se fait dans le meme appel PowerShell que l arret : timeout.exe
+rem refuse de s executer quand l entree standard est redirigee, ce qui arrive
+rem des que ce script est lance autrement que par un double-clic.
+powershell -NoProfile -Command "$c = Get-NetTCPConnection -LocalPort %PORT% -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1; if ($c) { Stop-Process -Id $c.OwningProcess -Force; Start-Sleep -Seconds 2 }"
+exit /b 0
 
 rem Sous-routine : interroge http://127.0.0.1:%PORT%/api/etat et distingue
 rem trois cas via errorlevel :
