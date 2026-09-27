@@ -190,6 +190,15 @@ Toutes ecrivent dans les memes fichiers de `data/projects/` et `data/people.md`.
 1. **Conversation avec Claude Code**, dans ce dossier : `CLAUDE.md` decrit le format des
    fichiers projet, les references et les regles a respecter. Claude edite alors les fichiers
    Markdown directement.
+1bis. **Liste WhatsApp, sens retour** : toutes les heures, la tache planifiee
+   `Secretariat - liste WhatsApp` (`npm run publier-liste`, `outils/publier-liste.js`) republie
+   dans la conversation `filTachesWhatsApp` la liste complete des taches ouvertes, classee par
+   priorite, chacune en huit mots au plus, au format a puces de la liste manuscrite. Rien n'est
+   envoye si la liste deja presente designe les memes taches dans le meme ordre. La destination
+   vient uniquement de `data/config.json`, jamais du corps d'une requete ni d'une reponse de
+   Claude. `GET /api/liste-sortante` montre le message sans l'envoyer,
+   `POST /api/liste-sortante/publier` declenche la publication.
+
 2. **Note a soi-meme dans Beeper** : l'agent hebdomadaire lit les messages non traites du fil
    designe dans `data/config.json` (`filNoteASoiMeme`) et les transforme en taches.
 3. **Dashboard** (`http://127.0.0.1:5556`) : le panneau « Ma semaine » porte le top 5 des

@@ -104,11 +104,31 @@ const MARGE = 0.05;
 // `taches` est une liste plate de {projet, tache} deja filtree sur les taches
 // ouvertes par l'appelant : ce fichier ne connait pas la regle « tache ouverte »,
 // qui appartient a store.js.
+// Meilleur score entre la ligne et tout ce qui peut designer cette tache : son
+// intitule, et les libelles sous lesquels le secretariat l'a deja publiee dans
+// la conversation (`alias`).
+//
+// Sans ces alias, une liste publiee par le secretariat ne se reconnaissait pas
+// elle-meme au passage suivant : ses libelles font huit mots au plus, une tache
+// intitulee « Creer un agent qui va relancer tous les commerciaux que j'ai dans
+// ma base regulierement » y devient « Creer agent qui relance commerciaux
+// regulierement », et les deux partagent trop peu de mots pour s'apparier. La
+// liste repartait donc a chaque heure, et la synchro entrante proposait de
+// recreer des taches qui existaient deja.
+function scoreCandidat(ligne, candidat) {
+  let meilleur = similarite(ligne, candidat.tache.titre);
+  (candidat.alias || []).forEach((a) => {
+    const s = similarite(ligne, a);
+    if (s > meilleur) meilleur = s;
+  });
+  return meilleur;
+}
+
 function apparier(ligne, taches) {
   let meilleur = null;
   let second = 0;
   taches.forEach((candidat) => {
-    const score = similarite(ligne, candidat.tache.titre);
+    const score = scoreCandidat(ligne, candidat);
     if (meilleur === null || score > meilleur.score) {
       second = meilleur === null ? 0 : meilleur.score;
       meilleur = {projet: candidat.projet, tache: candidat.tache, score};
@@ -131,6 +151,46 @@ function lignesRetirees(precedente, courante) {
   return (precedente || []).filter((l) => !presentes.has(normaliser(l)));
 }
 
+// Taches que le proprietaire a faites entre deux listes : celles qu'une ligne de
+// la liste precedente designait et qu'aucune ligne de la liste courante ne
+// designe plus.
+//
+// Le raisonnement porte sur les taches, pas sur le texte des lignes, et c'est
+// indispensable depuis que le secretariat publie lui-meme la liste dans la
+// conversation. Ses libelles sont volontairement courts (huit mots au plus) et
+// ne ressemblent donc pas au texte manuscrit d'origine : une comparaison
+// textuelle verrait disparaitre presque toutes les lignes au premier message
+// publie, et proposerait de supprimer la quasi-totalite du portefeuille. En
+// passant par la tache designee, une reformulation n'a plus aucun effet.
+//
+// Renvoie [{ref, projet, tache, ligne}], `ligne` etant le libelle qui la
+// designait dans la liste precedente, celui qu'il faut montrer au proprietaire.
+function tachesDisparues(precedente, courante, tachesOuvertes) {
+  const designees = new Set();
+  (courante || []).forEach((l) => {
+    const m = apparier(l, tachesOuvertes);
+    if (m) designees.add(refDe(m));
+  });
+
+  const sorties = [];
+  const vues = new Set();
+  (precedente || []).forEach((l) => {
+    const m = apparier(l, tachesOuvertes);
+    if (!m) return;
+    const ref = refDe(m);
+    if (designees.has(ref) || vues.has(ref)) return;
+    vues.add(ref);
+    sorties.push({ref, projet: m.projet, tache: m.tache, ligne: l});
+  });
+  return sorties;
+}
+
+// Reference d'un appariement. Ce fichier ne depend pas de store.js pour rester
+// purement textuel : le prefixe et le numero suffisent a identifier la tache.
+function refDe(m) {
+  return m.projet.prefixe + m.tache.n;
+}
+
 // Lignes de la liste courante qui ne correspondent a aucune tache ouverte du
 // portefeuille. Ce sont les candidates a la creation.
 function lignesInconnues(courante, taches) {
@@ -138,6 +198,6 @@ function lignesInconnues(courante, taches) {
 }
 
 module.exports = {
-  extraireListe, normaliser, similarite, apparier,
-  lignesRetirees, lignesInconnues, MINIMUM_LIGNES, SEUIL
+  extraireListe, normaliser, similarite, scoreCandidat, apparier,
+  lignesRetirees, tachesDisparues, lignesInconnues, MINIMUM_LIGNES, SEUIL
 };

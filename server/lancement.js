@@ -7,6 +7,7 @@ const repo = require('./repo.js');
 const beeper = require('./beeper.js');
 const liste = require('./liste-whatsapp.js');
 const config = require('./config.js');
+const sortante = require('./liste-sortante.js');
 
 // Rapprochement effectue a chaque ouverture du tableau de bord entre la liste de
 // taches tenue dans la conversation WhatsApp a soi-meme et le portefeuille.
@@ -94,31 +95,31 @@ async function analyser(ctx, opts) {
   }
 
   const {projects} = repo.loadAllSafe(ctx.projectsDir);
-  const ouvertes = tachesOuvertes(projects);
+  // Les libelles sous lesquels le secretariat a deja publie la liste servent
+  // d'alias a l'appariement. Sans eux, ses propres messages ne se reconnaissent
+  // pas : leurs libelles courts partagent trop peu de mots avec les intitules,
+  // et chaque publication faisait proposer la creation de taches qui existaient
+  // deja.
+  const ouvertes = sortante.avecAlias(tachesOuvertes(projects), ctx.dataDir);
 
   // Suppressions : une ligne disparue entre l'avant-derniere liste et la
   // derniere. Sans liste precedente (premier message de liste du fil), il n'y a
   // aucune disparition a constater, seulement des taches a creer.
   const precedente = listes[1] || null;
-  const retirees = precedente
-    ? liste.lignesRetirees(precedente.lignes, courante.lignes)
-    : [];
-
-  const aRetirer = [];
-  retirees.forEach((ligne) => {
-    const m = liste.apparier(ligne, ouvertes);
-    // Une ligne disparue qui ne correspond a aucune tache ouverte n'appelle
-    // aucune action : elle n'a jamais existe dans le portefeuille, ou elle y est
-    // deja close.
-    if (m === null) return;
-    aRetirer.push({
-      ref: store.refOf(m.projet, m.tache),
-      titre: m.tache.titre,
-      projet: m.projet.titre,
-      projetId: m.projet.id,
-      ligne
-    });
-  });
+  // La comparaison porte sur les taches designees, jamais sur le texte des
+  // lignes : le secretariat publie lui-meme la liste dans cette conversation,
+  // avec des libelles courts qui ne ressemblent pas au texte manuscrit. Une
+  // comparaison textuelle proposerait de supprimer presque tout au premier
+  // message publie (voir liste.tachesDisparues).
+  const aRetirer = (precedente
+    ? liste.tachesDisparues(precedente.lignes, courante.lignes, ouvertes)
+    : []).map((d) => ({
+      ref: store.refOf(d.projet, d.tache),
+      titre: d.tache.titre,
+      projet: d.projet.titre,
+      projetId: d.projet.id,
+      ligne: d.ligne
+    }));
 
   // Creations : une ligne de la liste courante qui ne correspond a aucune tache
   // ouverte. Les lignes qu'on vient de proposer a la suppression en sont exclues

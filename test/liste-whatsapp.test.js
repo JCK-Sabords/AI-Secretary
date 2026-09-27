@@ -113,3 +113,55 @@ test('lignesInconnues garde ce qui n est dans aucune tache ouverte', () => {
   assert.deepStrictEqual(liste.lignesInconnues(lignes, PORTEFEUILLE),
     ['vendre BTC', 'Vendre or']);
 });
+
+/* ---------- taches disparues : le raisonnement porte sur la tache, pas le texte ---------- */
+
+// Le cas qui compte. Le secretariat publie lui-meme la liste avec des libelles
+// courts. Comparees au texte manuscrit d'origine, ces lignes n'ont presque
+// aucun mot commun ligne a ligne, mais elles designent les memes taches : rien
+// ne doit etre considere comme fait.
+test('tachesDisparues ignore une reformulation complete de la liste', () => {
+  const manuscrite = [
+    'Passer PSPO 2',
+    'finir secrétaire IA',
+    'TOPI FAM - faire page presse - 21 sept'
+  ];
+  const publiee = [
+    'Passer PSPO 2',
+    'Finir secretaire IA',
+    'TOPI FAM - faire page presse'
+  ];
+  assert.deepStrictEqual(
+    liste.tachesDisparues(manuscrite, publiee, PORTEFEUILLE).map((d) => d.ref), []);
+});
+
+test('tachesDisparues repere la tache qu aucune ligne ne designe plus', () => {
+  const avant = ['Passer PSPO 2', 'finir secrétaire IA', 'TOPI FAM - faire page presse'];
+  const apres = ['Passer PSPO 2', 'finir secrétaire IA'];
+  const d = liste.tachesDisparues(avant, apres, PORTEFEUILLE);
+  assert.deepStrictEqual(d.map((x) => x.ref), ['TO1']);
+  assert.strictEqual(d[0].ligne, 'TOPI FAM - faire page presse',
+    'le libelle qui la designait est conserve pour l affichage');
+});
+
+test('tachesDisparues ignore une ligne qui ne designe aucune tache ouverte', () => {
+  const avant = ['Passer PSPO 2', 'acheter un manteau'];
+  const apres = ['Passer PSPO 2'];
+  assert.deepStrictEqual(
+    liste.tachesDisparues(avant, apres, PORTEFEUILLE).map((d) => d.ref), []);
+});
+
+// Deux lignes de la liste precedente peuvent designer la meme tache (doublon ou
+// reformulation) : elle ne doit apparaitre qu une fois.
+test('tachesDisparues ne rend jamais deux fois la meme tache', () => {
+  const avant = ['finir secrétaire IA', 'Finir secretaire IA'];
+  const apres = ['Passer PSPO 2'];
+  assert.deepStrictEqual(
+    liste.tachesDisparues(avant, apres, PORTEFEUILLE).map((d) => d.ref), ['AU6']);
+});
+
+test('tachesDisparues encaisse une liste vide ou absente', () => {
+  assert.deepStrictEqual(liste.tachesDisparues([], [], PORTEFEUILLE), []);
+  assert.deepStrictEqual(liste.tachesDisparues(null, null, PORTEFEUILLE), []);
+  assert.deepStrictEqual(liste.tachesDisparues(['Passer PSPO 2'], [], []), []);
+});

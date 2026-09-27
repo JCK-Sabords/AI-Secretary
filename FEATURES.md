@@ -640,3 +640,50 @@ Un champ **dossier de travail** est ajoute aux projets, facultatif. Renseigne, l
 s'ouvre directement dedans. Un chemin relatif ou reseau est ignore plutot que transmis : mieux
 vaut ouvrir sans dossier qu'au mauvais endroit. Le secretariat ne lit et n'ecrit jamais rien a
 cet endroit, ce champ ne sert qu'a construire le lien.
+
+## Iteration 29 : la liste WhatsApp est tenue a jour dans l'autre sens
+
+L'ingestion existait depuis l'iteration 24 : le secretariat lisait la liste manuscrite du fil a
+soi-meme. Le sens retour est maintenant en place. Toutes les heures, s'il y a du nouveau, le
+secretariat republie dans cette meme conversation la liste complete de ses taches ouvertes,
+classees par priorite comme « Ma semaine », chacune en huit mots au plus, au format a puces
+exact de la liste manuscrite.
+
+Trois garanties structurent le module.
+
+**La destination ne vient jamais du modele.** C'est `filTachesWhatsApp` de `data/config.json`,
+le meme fil que celui qui est lu. Ni la route d'API ni la reponse de Claude ne peuvent faire
+partir ce message ailleurs.
+
+**La liste est toujours complete.** Une tache que le modele aurait oubliee dans son classement
+est ajoutee a la fin, avec son intitule d'origine raccourci. Cette liste remplace celle que le
+proprietaire garde sur son telephone : une tache oubliee serait une tache perdue. Si Claude est
+injoignable, la liste part quand meme, dans l'ordre du portefeuille : un fil muet serait pire
+qu'un classement imparfait.
+
+**Rien ne part si rien n'a change.** La comparaison porte sur la suite des taches designees par
+la derniere liste presente dans la conversation, jamais sur son texte, et le classement est mis
+en cache sur l'empreinte du portefeuille. Sans ce cache, deux classements du meme portefeuille
+differeraient legerement et chaque passage horaire enverrait un message pour rien.
+
+### Le piege de la boucle, traite avant d'ecrire le module
+
+Faire ecrire le secretariat dans la conversation qu'il lit cree un risque evident : ses propres
+messages relus comme des modifications du proprietaire. Deux corrections l'ont ferme.
+
+**La detection des taches faites porte desormais sur les taches, pas sur le texte des lignes**
+(`liste.tachesDisparues`). Une tache n'est consideree comme faite que si une ligne de la liste
+precedente la designait et qu'aucune ligne de la liste courante ne la designe plus. Avec une
+comparaison textuelle, la premiere publication aurait fait disparaitre presque toutes les
+lignes d'un coup, et propose de supprimer la quasi-totalite du portefeuille.
+
+**Les libelles deja publies servent d'alias a l'appariement.** Ce defaut n'est pas apparu en
+test mais au premier envoi reel : un libelle de huit mots partage trop peu de mots avec un
+intitule long pour s'apparier a lui. Le secretariat ne reconnaissait donc pas son propre
+message, republiait la liste a chaque heure, et la synchro entrante proposait de recreer six
+taches qui existaient deja. Les libelles publies sont maintenant memorises par tache (quatre au
+plus, les plus recents) et servent d'alias, ce qui rend la reconnaissance exacte.
+
+Le tout tourne sous la tache planifiee `Secretariat - liste WhatsApp`, toutes les heures.
+`npm run publier-liste` fait la meme chose a la demande, et `GET /api/liste-sortante` montre le
+message sans rien envoyer.

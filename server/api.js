@@ -10,6 +10,7 @@ const sante = require('./sante');
 const lancement = require('./lancement');
 const devinerProjet = require('./deviner-projet');
 const semaine = require('./semaine');
+const listeSortante = require('./liste-sortante');
 
 function aujourdhui() {
   const d = new Date();
@@ -237,6 +238,31 @@ async function handle(req, body, ctx) {
       return {status: 200, json: await semaine.calculer(ctx)};
     } catch (e) {
       return {status: 200, json: {top: [], erreur: 'classement indisponible'}};
+    }
+  }
+
+  // Liste a publier dans la conversation a soi-meme : ce que le message
+  // contiendrait, sans rien envoyer. Permet de la relire avant publication.
+  if (req.method === 'GET' && url === '/api/liste-sortante') {
+    try {
+      const prep = await listeSortante.preparer(ctx);
+      return {status: 200, json: {
+        lignes: prep.lignes,
+        texte: listeSortante.rendreMessage(prep.lignes)
+      }};
+    } catch (e) {
+      return {status: 200, json: {lignes: [], texte: '', erreur: 'liste indisponible'}};
+    }
+  }
+
+  // Publication effective. La destination n'est jamais dans le corps de la
+  // requete : c'est filTachesWhatsApp de data/config.json, le meme fil que
+  // celui qui est lu. Aucun appelant ne peut faire partir ce message ailleurs.
+  if (req.method === 'POST' && url === '/api/liste-sortante/publier') {
+    try {
+      return {status: 200, json: await listeSortante.publier(ctx)};
+    } catch (e) {
+      return {status: 500, json: {envoye: false, raison: 'erreur', message: e.message}};
     }
   }
 

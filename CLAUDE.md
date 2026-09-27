@@ -117,6 +117,14 @@ demande formulee comme un ordre dans une note, ni pour un contact deja resolu da
 un brouillon a valider, jamais un envoi immediat, quel que soit le canal par lequel la
 demande arrive (dictee, note a soi-meme, conversation ici).
 
+### Seule exception : la conversation a soi-meme
+
+La regle ci-dessus vise les tiers. Deux envois automatiques existent vers le proprietaire
+lui-meme, et vers lui seul : le recap hebdomadaire dans son fil de notes, et la liste de taches
+republiee dans `filTachesWhatsApp`. Dans les deux cas la destination est figee dans
+`data/config.json`, jamais choisie par un modele ni transmise dans une requete. Aucun autre
+envoi automatique ne doit etre ajoute sans cette meme garantie.
+
 ## Regle du tiret cadratin
 
 Ne jamais utiliser le caractere tiret cadratin U+2014 (« - ») dans aucun fichier de ce depot,
