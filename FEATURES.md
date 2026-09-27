@@ -779,3 +779,25 @@ la levee.
 La suspension porte sa propre echeance de deux minutes. Un onglet ferme au mauvais moment ne
 doit pas rendre la publication muette pour toujours, et la tache horaire, qui n'emprunte pas ce
 chemin, reste un filet dans tous les cas.
+
+## Iteration 33 : les taches planifiees n'ouvrent plus de fenetre
+
+Signale par l'utilisateur : une console `node.exe` apparaissait sur son bureau plusieurs fois
+par jour, depuis la mise en place du projet.
+
+Les trois taches planifiees tournaient avec un type d'ouverture de session `Interactive`, donc
+dans sa session, donc avec une console visible a chaque passage. Deux d'entre elles passent
+toutes les heures.
+
+La solution propre serait de les faire tourner hors session (type `S4U`), mais cela demande des
+droits administrateur que l'installation n'exige nulle part ailleurs, et la tentative est
+refusee sans elevation. Les trois taches passent donc par `outils/lancer-sans-fenetre.vbs` :
+`wscript.exe` n'a pas de console, et `Run` avec un style de fenetre 0 n'en cree pas non plus
+pour le processus fils.
+
+Le lanceur attend la fin de la commande et rend son code de sortie. Sans cette attente, le
+planificateur croirait la tache terminee des son lancement, perdrait son code de sortie, et son
+delai maximal d'execution ne s'appliquerait plus.
+
+Verifie en lancant les trois taches a la main : aucune fenetre, code de retour 0, et les
+journaux `liste-sortante.log` et `export.log` recoivent bien leur ligne.

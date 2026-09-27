@@ -105,6 +105,18 @@ npm start
 
 Puis ouvrir `http://127.0.0.1:5556`. Le serveur n'ecoute que sur `127.0.0.1`.
 
+## Les taches planifiees
+
+Les trois taches (`Secretariat - liste WhatsApp` et `Secretariat - export mobile`, toutes les
+heures ; `Secretariat - recap hebdo`, le mardi) passent par `outils/lancer-sans-fenetre.vbs`.
+Sans lui, chacune ouvrirait une console sur le bureau a chaque passage, plusieurs fois par
+jour : une tache planifiee lancee dans la session de l'utilisateur affiche la fenetre de son
+processus. Le lanceur attend la fin de la commande et rend son code de sortie, pour que le
+planificateur garde un resultat exact et que son delai maximal d'execution s'applique.
+
+La faire tourner hors session (`S4U`) donnerait le meme resultat sans script intermediaire,
+mais demande des droits administrateur que rien d'autre dans cette installation n'exige.
+
 ## Le raccourci
 
 Le lanceur reutilise un serveur qui repond deja, sauf si le code a change depuis son
