@@ -446,3 +446,76 @@ test('une ecriture refusee ne declenche aucune republication', async () => {
   await new Promise((res) => setTimeout(res, 120));
   assert.strictEqual(envois.length, 0);
 });
+
+/* ---------- suspension pendant le delai d annulation ---------- */
+
+function ctxSuspension(envois) {
+  const ctx = contexte([projet('topi', 'TO', 'TOPI',
+    [{titre: 'un'}, {titre: 'deux'}, {titre: 'trois'}])]);
+  ctx.publierAuto = true;
+  ctx.delaiPublicationMs = 10;
+  ctx.lireMessages = async () => [];
+  ctx.envoyer = async (chatID, texte) => { envois.push(texte); return {ok: true}; };
+  ctx.lancerClaude = async () => '{"liste":[{"tache":"TO1","libelle":"un"},' +
+    '{"tache":"TO2","libelle":"deux"},{"tache":"TO3","libelle":"trois"}]}';
+  return ctx;
+}
+
+// Le cas exact signale par l'utilisateur : le bouton croix retire la tache de
+// l'ecran tout de suite mais n'envoie la suppression qu'apres six secondes. Une
+// publication armee par une modification anterieure ne doit pas tomber dans cet
+// intervalle : elle partirait avec une tache qu'il voit deja disparue.
+test('une publication armee est retenue tant qu une suppression attend', async () => {
+  const envois = [];
+  const ctx = ctxSuspension(envois);
+  sortante.differerPublication(ctx, true);
+  assert.strictEqual(sortante.planifierPublication(ctx), false,
+    'rien ne doit etre arme pendant la suspension');
+  await new Promise((r) => setTimeout(r, 60));
+  assert.strictEqual(envois.length, 0);
+  sortante.differerPublication(ctx, false);
+});
+
+test('lever la suspension envoie la publication qui etait due', async () => {
+  const envois = [];
+  const ctx = ctxSuspension(envois);
+  sortante.differerPublication(ctx, true);
+  sortante.planifierPublication(ctx);
+  await new Promise((r) => setTimeout(r, 60));
+  assert.strictEqual(envois.length, 0, 'toujours rien pendant la suspension');
+
+  sortante.differerPublication(ctx, false);
+  await new Promise((r) => setTimeout(r, 80));
+  assert.strictEqual(envois.length, 1, 'la publication due part une fois la suspension levee');
+});
+
+// Une suppression annulee n'ecrit rien, donc rien n'etait du : lever ne doit
+// pas inventer une publication.
+test('lever la suspension n envoie rien si aucune publication n etait due', async () => {
+  const envois = [];
+  const ctx = ctxSuspension(envois);
+  sortante.differerPublication(ctx, true);
+  sortante.differerPublication(ctx, false);
+  await new Promise((r) => setTimeout(r, 80));
+  assert.strictEqual(envois.length, 0);
+});
+
+// Un onglet ferme au mauvais moment ne doit pas figer la publication pour
+// toujours : la suspension porte sa propre echeance.
+test('la suspension a une duree de vie bornee', () => {
+  assert.ok(sortante.SUSPENSION_MAX_MS > 0);
+  assert.ok(sortante.SUSPENSION_MAX_MS <= 300000,
+    'une suspension trop longue rendrait la publication muette apres un onglet ferme');
+});
+
+test('le corps de /api/liste-sortante/differer est valide', async () => {
+  const api = require('../server/api.js');
+  const ctx = contexte([]);
+  const mauvais = await api.handle(
+    {method: 'POST', url: '/api/liste-sortante/differer'}, {actif: 'oui'}, ctx);
+  assert.strictEqual(mauvais.status, 400);
+  const bon = await api.handle(
+    {method: 'POST', url: '/api/liste-sortante/differer'}, {actif: false}, ctx);
+  assert.strictEqual(bon.status, 200);
+  assert.strictEqual(bon.json.suspendu, false);
+});

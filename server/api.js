@@ -272,6 +272,17 @@ async function handle(req, body, ctx) {
     }
   }
 
+  // Suspend ou reprend la republication automatique. Le tableau de bord suspend
+  // tant qu'une suppression attend sa confirmation : pendant ce delai, la tache
+  // a disparu de l'ecran mais pas encore du disque, et publier reviendrait a
+  // envoyer une liste que l'utilisateur sait deja perimee.
+  if (req.method === 'POST' && url === '/api/liste-sortante/differer') {
+    if (!body || typeof body.actif !== 'boolean') {
+      return {status: 400, json: {erreur: 'corps attendu : {actif: true|false}'}};
+    }
+    return {status: 200, json: listeSortante.differerPublication(ctx, body.actif)};
+  }
+
   // Publication effective. La destination n'est jamais dans le corps de la
   // requete : c'est filTachesWhatsApp de data/config.json, le meme fil que
   // celui qui est lu. Aucun appelant ne peut faire partir ce message ailleurs.

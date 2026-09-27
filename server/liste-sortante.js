@@ -324,10 +324,54 @@ async function publier(ctx, options) {
 const DELAI_PUBLICATION_MS = 15000;
 let minuteurPublication = null;
 
+// Suspension demandee par le tableau de bord pendant qu'une suppression attend
+// sa confirmation. Le bouton croix fait disparaitre la tache de l'ecran tout de
+// suite, mais n'envoie la suppression qu'a l'expiration du bandeau « Annuler » :
+// entre les deux, l'ecran et le serveur ne disent pas la meme chose. Une
+// publication armee par une modification anterieure pourrait tomber dans cet
+// intervalle et partir avec une tache que l'utilisateur voit deja disparue.
+//
+// La suspension porte une echeance propre : un onglet ferme au mauvais moment ne
+// doit pas figer la publication pour toujours. Passe ce delai, elle est ignoree.
+const SUSPENSION_MAX_MS = 120000;
+let suspensionJusqua = 0;
+let publicationDue = false;
+
+function suspendue() {
+  return suspensionJusqua > Date.now();
+}
+
+// Le tableau de bord suspend des qu'une premiere suppression est en attente, et
+// leve des que la derniere est tranchee, confirmee ou annulee. Lever declenche
+// la publication qui avait ete demandee entre-temps, s'il y en a eu une.
+function differerPublication(ctx, actif) {
+  if (actif) {
+    suspensionJusqua = Date.now() + SUSPENSION_MAX_MS;
+    return {suspendu: true};
+  }
+  suspensionJusqua = 0;
+  if (publicationDue) {
+    publicationDue = false;
+    armer(ctx);
+  }
+  return {suspendu: false};
+}
+
 // Renvoie true si une publication a ete programmee. Elle ne l est que si le
 // contexte l autorise explicitement : les tests construisent leur propre
 // contexte et ne doivent jamais declencher d envoi reel.
 function planifierPublication(ctx, options) {
+  if (!ctx || ctx.publierAuto !== true) return false;
+  if (suspendue()) {
+    // La publication n'est pas perdue, elle est due : elle partira des que la
+    // derniere suppression en attente aura ete tranchee.
+    publicationDue = true;
+    return false;
+  }
+  return armer(ctx, options);
+}
+
+function armer(ctx, options) {
   if (!ctx || ctx.publierAuto !== true) return false;
   // Delai reglable par le contexte, pour que les tests verifient le chemin
   // complet (ecriture, programmation, envoi) sans attendre quinze secondes.
@@ -356,6 +400,6 @@ function planifierPublication(ctx, options) {
 }
 
 module.exports = {construirePrompt, interpreter, raccourcir, rendreMessage,
-  planifierPublication, DELAI_PUBLICATION_MS,
+  planifierPublication, differerPublication, DELAI_PUBLICATION_MS, SUSPENSION_MAX_MS,
   preparer, publier, refsDeLaDerniereListe, empreinte, extraireJson,
   aliasPublies, avecAlias, memoriserPublication, MOTS_MAX, FICHIER};

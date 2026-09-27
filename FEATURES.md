@@ -758,3 +758,24 @@ Consequences traitees dans la meme iteration :
 
 Un fichier ecrit avant ce retrait reste lisible : le champ est ignore au chargement et n'est
 jamais recopie a l'ecriture.
+
+## Iteration 32 : pas de publication pendant le delai d'annulation
+
+Le bouton croix retire une tache de l'ecran immediatement, mais n'envoie la suppression qu'a
+l'expiration du bandeau « Annuler », six secondes plus tard. Entre les deux, l'ecran et le
+disque ne disent pas la meme chose.
+
+Une suppression annulee n'ecrivait deja rien, donc ne publiait rien : ce cas etait couvert. Le
+trou etait plus etroit. Une publication armee par une modification anterieure, quinze secondes
+plus tot, pouvait tomber pendant ces six secondes et partir avec une tache que l'utilisateur
+voyait deja disparue. Un message immediatement perime, corrige quelques secondes plus tard par
+un second.
+
+Le tableau de bord suspend donc la republication des qu'une suppression attend sa confirmation
+(`POST /api/liste-sortante/differer`), et la leve des que la derniere est tranchee, confirmee ou
+annulee. Une publication demandee pendant la suspension n'est pas perdue mais due : elle part a
+la levee.
+
+La suspension porte sa propre echeance de deux minutes. Un onglet ferme au mauvais moment ne
+doit pas rendre la publication muette pour toujours, et la tache horaire, qui n'emprunte pas ce
+chemin, reste un filet dans tous les cas.

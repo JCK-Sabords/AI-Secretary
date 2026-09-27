@@ -1537,6 +1537,25 @@ function deleteProjectDrawer(projectId){ deleteProjectConfirm(projectId); }
    requete delete_task n'est envoyee qu'a l'expiration de ce delai. Chaque tache
    supprimee en rafale garde son propre minuteur et son propre bandeau, empiles
    dans #undoHost. */
+// Tant qu'une suppression attend sa confirmation, la tache a disparu de l'ecran
+// mais pas encore du disque : le serveur ne doit pas republier la liste sur
+// WhatsApp dans cet intervalle, il enverrait une liste que l'utilisateur sait
+// deja perimee. On suspend donc des la premiere suppression en attente, et on
+// leve des que la derniere est tranchee, confirmee ou annulee. Un echec de cet
+// appel est sans gravite : la suspension expire d'elle-meme cote serveur, et la
+// publication n'est de toute facon envoyee que si la liste a change.
+function signalerAttenteSuppression(){
+  var actif = Object.keys(pendingDeletes).length > 0;
+  if (actif === suppressionDifferee) return;
+  suppressionDifferee = actif;
+  fetch('/api/liste-sortante/differer', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({actif: actif})
+  }).catch(function(){});
+}
+var suppressionDifferee = false;
+
 function supprimerTacheRapide(projetId, n){
   var p = projectById(projetId);
   if (!p) return;
@@ -1545,6 +1564,7 @@ function supprimerTacheRapide(projetId, n){
   if (editing && editing.pid === projetId && editing.n === n) editing = null;
   if (inlineEdit && inlineEdit.pid === projetId && inlineEdit.n === n) inlineEdit = null;
   pendingDeletes[ref] = {};
+  signalerAttenteSuppression();
   renderAll();
   var div = document.createElement('div');
   div.className = 'toast';
@@ -1555,6 +1575,9 @@ function supprimerTacheRapide(projetId, n){
   pendingDeletes[ref].timer = setTimeout(function(){
     if (div.parentNode) div.remove();
     delete pendingDeletes[ref];
+    // La suspension est levee avant l'envoi : c'est cette ecriture qui doit
+    // programmer la republication, avec la tache enfin retiree.
+    signalerAttenteSuppression();
     envoyerOps([{op: 'delete_task', ref: ref}]);
   }, 6000);
 }
@@ -1564,6 +1587,7 @@ function annulerSuppression(ref){
   clearTimeout(pd.timer);
   if (pd.div && pd.div.parentNode) pd.div.remove();
   delete pendingDeletes[ref];
+  signalerAttenteSuppression();
   renderAll();
 }
 // Fermer l onglet pendant le delai d annulation ne doit pas faire perdre la

@@ -203,7 +203,12 @@ Toutes ecrivent dans les memes fichiers de `data/projects/` et `data/people.md`.
    envoye si la liste deja presente designe les memes taches dans le meme ordre. Toute ecriture
    appliquee (suppression, renommage, changement de priorite, reordonnancement) programme aussi
    une republication, quinze secondes apres la derniere, de sorte qu'une rafale de
-   modifications ne produise qu'un seul message ; la tache horaire n'est plus qu'un filet. La destination
+   modifications ne produise qu'un seul message ; la tache horaire n'est plus qu'un filet.
+   La republication est suspendue tant qu'une suppression attend sa confirmation dans le
+   bandeau « Annuler » (`POST /api/liste-sortante/differer`) : pendant ces six secondes la tache
+   a disparu de l'ecran mais pas du disque, et publier enverrait une liste deja perimee. Une
+   publication demandee entre-temps part a la levee de la suspension, qui expire d'elle-meme au
+   bout de deux minutes si l'onglet se ferme. La destination
    vient uniquement de `data/config.json`, jamais du corps d'une requete ni d'une reponse de
    Claude. `GET /api/liste-sortante` montre le message sans l'envoyer,
    `POST /api/liste-sortante/publier` declenche la publication.
