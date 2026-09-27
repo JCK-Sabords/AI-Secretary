@@ -71,6 +71,53 @@ test('chercherContacts normalise les trois champs reels', async () => {
   s.close();
 });
 
+// Beeper renvoie la meme personne deux fois : sous sa forme brute et sous sa
+// forme qualifiee. Les deux ouvrent la meme conversation, verifie en les
+// comparant sur un contact deja resolu, mais afficher chaque partenaire en
+// double rend le choix illisible au moment d'assigner une tache.
+test('chercherContacts ne rend qu une fois un contact renvoye sous deux formes', async () => {
+  const s = await bouchon({
+    'GET /v1/accounts/whatsapp/contacts': () => ({items: [
+      {id: 'lid-100000000000001', phoneNumber: '+33600000001', fullName: 'Camille D.'},
+      {id: 'lid-100000000000002', phoneNumber: '+33600000002', fullName: 'Olivier M.'},
+      {id: '@whatsapp_lid-100000000000001:beeper.local', phoneNumber: '+33600000001',
+        fullName: 'Camille D.'},
+      {id: '@whatsapp_lid-100000000000002:beeper.local', phoneNumber: '+33600000002',
+        fullName: 'Olivier M.'}
+    ]})
+  });
+  const res = await beeper.chercherContacts('whatsapp', 'S', {base: adresse(s), token: 'x'});
+  assert.strictEqual(res.length, 2);
+  // La forme qualifiee l'emporte : c'est celle que portent les fiches deja
+  // resolues, le repertoire reste homogene.
+  assert.deepStrictEqual(res.map((c) => c.id), [
+    '@whatsapp_lid-100000000000001:beeper.local',
+    '@whatsapp_lid-100000000000002:beeper.local']);
+  s.close();
+});
+
+// Deux homonymes sans numero sont deux personnes differentes : la
+// deduplication porte sur l'identifiant, jamais sur le nom.
+test('chercherContacts ne fusionne pas deux homonymes distincts', async () => {
+  const s = await bouchon({
+    'GET /v1/accounts/telegram/contacts': () => ({items: [
+      {id: 'tg-1', fullName: 'Jean Martin'},
+      {id: 'tg-2', fullName: 'Jean Martin'}
+    ]})
+  });
+  const res = await beeper.chercherContacts('telegram', 'Jean', {base: adresse(s), token: 'x'});
+  assert.strictEqual(res.length, 2);
+  s.close();
+});
+
+test('noyauContact retrouve l identifiant sous son habillage', () => {
+  assert.strictEqual(beeper.noyauContact('@whatsapp_lid-42:beeper.local'), 'lid-42');
+  assert.strictEqual(beeper.noyauContact('lid-42'), 'lid-42');
+  assert.strictEqual(beeper.noyauContact('33600000000'), '33600000000');
+  assert.strictEqual(beeper.noyauContact(''), '');
+  assert.strictEqual(beeper.noyauContact(null), '');
+});
+
 test('ouvrirChat demande une conversation individuelle', async () => {
   let vu = null;
   const s = await bouchon({

@@ -825,3 +825,45 @@ le motif des la taille 32.
 `installer-raccourci.ps1` applique l'icone, en retombant sur l'ancien comportement si le fichier
 manque. La meme icone sert de favicone au tableau de bord : l'onglet et le lanceur doivent se
 reconnaitre au premier coup d'oeil.
+
+## Iteration 34 : deleguer a n'importe quel contact Beeper
+
+Signale par l'utilisateur : impossible d'assigner une tache a quelqu'un d'autre que lui-meme et
+son frere, alors que les personnes a relancer sont ses partenaires, tous presents dans ses
+contacts Beeper.
+
+Le mecanisme d'ajout au repertoire existait pourtant, avec sa recherche de contacts et
+`POST /api/personne`. Il n'etait atteignable que depuis une relance bloquee. Or une relance
+bloquee suppose une tache deja assignee a une personne absente du repertoire, et la liste des
+responsables ne proposait que les personnes du repertoire : **le cercle etait ferme**, et seules
+les fiches ecrites a la main pouvaient en sortir.
+
+La liste des responsables porte desormais une entree « + Ajouter un contact Beeper... »,
+proposee y compris quand le repertoire est vide, precisement le cas ou elle est indispensable.
+Elle ouvre la recherche de contacts, cree la fiche, ouvre la conversation, et assigne la tache
+dans la foulee. Le tiroir sert donc deux origines : une relance bloquee, qui attend un
+identifiant de fiche precis, et une assignation en cours, qui cree la fiche de toutes pieces.
+
+L'identifiant de fiche derive du nom. Deux partenaires homonymes recoivent des identifiants
+distincts : sans cela le second ecraserait la fiche du premier et ses relances partiraient dans
+la mauvaise conversation.
+
+Deux garde-fous, parce que cette entree est une action et non un responsable : choisir l'entree
+remet la liste sur sa valeur precedente avant d'ouvrir le tiroir, et l'enregistrement de
+l'editeur la refuse une seconde fois. Sans cela, annuler le tiroir laisserait la liste sur une
+valeur qui serait ecrite telle quelle, et la tache serait assignee a une personne inexistante.
+
+### Chaque contact n'apparait plus qu'une fois
+
+Defaut trouve en cherchant sur de vrais contacts : Beeper renvoie la meme personne deux fois,
+sous sa forme brute (`lid-2115660...`) et sous sa forme qualifiee
+(`@whatsapp_lid-2115660...:beeper.local`). Verifie sur un contact deja resolu, les deux ouvrent
+bien la meme conversation, mais afficher chaque partenaire en double rend le choix illisible.
+
+La recherche deduplique donc sur l'identifiant debarrasse de son habillage, et garde la forme
+qualifiee, celle que portent les fiches deja resolues. La deduplication ne porte jamais sur le
+nom : deux homonymes sans numero de telephone sont deux personnes differentes.
+
+Verifie de bout en bout sur une copie des donnees : recherche d'un contact WhatsApp reel,
+creation de la fiche, assignation de la tache, et la relance quitte les bloquees pour les
+validables avec un brouillon nominatif.

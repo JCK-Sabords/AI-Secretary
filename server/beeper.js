@@ -71,12 +71,37 @@ async function disponible(opts) {
   catch (e) { return false; }
 }
 
+// Identifiant reel d'un contact, debarrasse de son habillage. Beeper renvoie la
+// meme personne deux fois : une fois sous sa forme brute (lid-2115660...) et une
+// fois sous sa forme qualifiee (@whatsapp_lid-2115660...:beeper.local). Les deux
+// ouvrent bien la meme conversation, verifie en les comparant sur un contact
+// deja resolu, mais afficher chaque partenaire en double rend le choix illisible
+// au moment d'assigner une tache.
+//
+// La deduplication porte sur ce noyau et non sur le nom : deux homonymes sans
+// numero de telephone sont deux personnes differentes et doivent le rester.
+function noyauContact(id) {
+  return String(id == null ? '' : id)
+    .replace(/^@[^_]*_/, '')
+    .replace(/:[^:]*$/, '');
+}
+
 async function chercherContacts(accountID, query, opts) {
   const data = await appel('/v1/accounts/' + encodeURIComponent(accountID) +
     '/contacts?query=' + encodeURIComponent(query), {method: 'GET'}, opts);
-  return (data.items || []).map((c) => ({
-    id: c.id, nom: c.fullName, telephone: c.phoneNumber || '', accountID
-  }));
+  const parNoyau = new Map();
+  (data.items || []).forEach((c) => {
+    const fiche = {id: c.id, nom: c.fullName, telephone: c.phoneNumber || '', accountID};
+    const cle = noyauContact(c.id);
+    const deja = parNoyau.get(cle);
+    // A noyau egal, on garde la forme qualifiee : c'est celle que portent les
+    // fiches deja resolues, autant que le repertoire reste homogene.
+    if (!deja || (String(fiche.id).indexOf(':') !== -1 &&
+        String(deja.id).indexOf(':') === -1)) {
+      parNoyau.set(cle, fiche);
+    }
+  });
+  return Array.from(parNoyau.values());
 }
 
 async function ouvrirChat(accountID, participantID, opts) {
@@ -114,5 +139,5 @@ async function messages(chatID, limite, opts) {
   })).sort((a, b) => (a.timestamp < b.timestamp ? 1 : a.timestamp > b.timestamp ? -1 : 0));
 }
 
-module.exports = {comptes, disponible, chercherContacts, ouvrirChat, envoyer,
+module.exports = {comptes, disponible, chercherContacts, noyauContact, ouvrirChat, envoyer,
   messages, BASE};

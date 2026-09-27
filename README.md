@@ -307,6 +307,13 @@ Toutes ecrivent dans les memes fichiers de `data/projects/` et `data/people.md`.
    `navigator.sendBeacon`, pour qu'elle ne soit jamais perdue. Le bouton `+` (« Ajouter une
    tache ») en tete de projet ouvre ce meme formulaire complet, vide, pour une nouvelle tache.
 
+   La liste des responsables propose « + Ajouter un contact Beeper... », y compris quand le
+   repertoire est vide. Elle ouvre la recherche de contacts, cree la fiche dans
+   `data/people.md` (`POST /api/personne`, qui ouvre aussi la conversation), et assigne la
+   tache. C'est la seule facon d'ajouter quelqu'un sans editer le fichier a la main : sans
+   elle, on ne pouvait deleguer qu'aux personnes deja presentes. La recherche ne montre chaque
+   contact qu'une fois, Beeper renvoyant la meme personne sous deux formes d'identifiant.
+
    Une tache deleguee (`responsable` different de `moi`) porte deux champs de relance,
    « Derniere relance » et « Prochaine relance », visibles uniquement pour ce cas (masques des
    la selection de `moi`, sans recharger le formulaire) ; un bouton « Dans une semaine » pose

@@ -586,8 +586,7 @@ function celluleTache(p, t, champ, affichageHtml){
         opts({P1:'P1', P2:'P2', P3:'P3', P4:'P4'}, t.prio) + '</select>';
     }
     if (champ === 'responsable') {
-      var respMap = {moi:'Moi'};
-      etat.people.forEach(function(per){ respMap[per.id] = per.nom; });
+      var respMap = respMapAvecAjout();
       return '<select class="' + cls.trim() + '" id="ie-champ" ' + attrsSauv + (inlineSaving ? ' disabled' : '') + '>' +
         opts(respMap, t.responsable) + '</select>';
     }
@@ -655,8 +654,7 @@ function editorHtml(p, t){
   var isNew = !t;
   t = t || {n:0, titre:'', responsable:'moi', echeance:'',
     nature_echeance:'souhaitee', prio:'P3', effort:'M', derniere_relance:'', prochaine_relance:''};
-  var respMap = {moi:'Moi'};
-  etat.people.forEach(function(per){ respMap[per.id] = per.nom; });
+  var respMap = respMapAvecAjout();
   // Les deux champs de relance n'ont de sens que pour une tache confiee a
   // quelqu'un d'autre : masques quand le responsable vaut "moi", affiches sinon.
   // Le bascule se fait par l'ecouteur "change" delegue sur #e-resp (voir plus bas),
@@ -1217,6 +1215,9 @@ function openDrawer(ref){
 function closeDrawer(){
   drawerHost.innerHTML = '';
   resolveRef = null;
+  // Un tiroir d'ajout annule ne doit pas laisser son contexte derriere lui :
+  // le choix suivant, venu d'une relance bloquee, prendrait le mauvais chemin.
+  contexteContact = null;
   // Invalide aussi toute recherche de resolution encore en vol : fermer ce
   // tiroir doit suffire a empecher sa reponse tardive de s'ecrire n'importe ou.
   resolveToken++;
@@ -1252,6 +1253,136 @@ function messageErreurBeeper(status, data){
 function afficherResultatsResolution(html){
   var host = document.getElementById('rcResults');
   if (host) host.innerHTML = html;
+}
+
+/* ============================ ajouter un contact depuis l'assignation ============================
+   Jusqu'ici, le repertoire ne pouvait s'enrichir que depuis une relance bloquee.
+   Or une relance bloquee suppose une tache deja assignee a quelqu'un, et on ne
+   pouvait assigner qu'aux personnes deja au repertoire : le cercle etait ferme,
+   et seules les fiches creees a la main en sortaient. La liste des responsables
+   porte donc desormais une entree qui ouvre la recherche de contacts Beeper, et
+   la fiche est creee puis assignee dans la foulee.
+*/
+var VALEUR_NOUVEAU_CONTACT = '__nouveau_contact';
+
+// Construit la liste des responsables : moi, les personnes du repertoire, puis
+// l'entree d'ajout. Elle est toujours proposee, y compris quand le repertoire
+// est vide : c'est precisement le cas ou elle est indispensable.
+function respMapAvecAjout(){
+  var m = {moi: 'Moi'};
+  etat.people.forEach(function(per){ m[per.id] = per.nom; });
+  m[VALEUR_NOUVEAU_CONTACT] = '+ Ajouter un contact Beeper...';
+  return m;
+}
+
+// Identifiant de fiche derive du nom, unique dans le repertoire. Deux partenaires
+// homonymes doivent pouvoir coexister : le second recoit un suffixe numerique
+// plutot que d'ecraser le premier.
+function idPourNouveauContact(nom){
+  var base = slugifyId(nom);
+  var pris = {};
+  etat.people.forEach(function(per){ pris[per.id] = true; });
+  if (!pris[base]) return base;
+  for (var i = 2; i < 100; i++) {
+    var essai = (base + '-' + i).slice(0, 64);
+    if (!pris[essai]) return essai;
+  }
+  return (base + '-' + Date.now()).slice(0, 64);
+}
+
+// Ce que le tiroir devra faire une fois le contact choisi. Deux origines
+// possibles : une relance bloquee (la fiche porte alors l'identifiant deja
+// attendu par la tache), ou une assignation en cours (la fiche est creee, puis
+// la tache lui est attribuee).
+var contexteContact = null;
+
+function ouvrirAjoutContact(origine){
+  contexteContact = origine;
+  resolveRef = null;
+  resolveToken++;
+  drawerHost.innerHTML =
+    '<div class="scrim" data-close></div>' +
+    '<aside class="drawer" role="dialog" aria-modal="true" aria-label="Ajouter un contact">' +
+      '<header><h3>Ajouter un contact</h3>' +
+        '<div class="route">Cherche la personne dans tes contacts Beeper. ' +
+          'Sa fiche sera créée et la conversation ouverte, pour que les relances ' +
+          'puissent lui être adressées.</div>' +
+      '</header><div class="body">' +
+        '<div class="f"><label class="k" for="rc-compte">Compte de messagerie</label>' +
+          '<select id="rc-compte"><option value="">Chargement des comptes...</option></select></div>' +
+        '<div class="f"><label class="k" for="rc-nom">Rechercher dans ce compte</label>' +
+          '<input type="text" id="rc-nom" value="" placeholder="Nom du contact"></div>' +
+        '<div class="eactions"><span class="spacer"></span>' +
+          '<button class="btn" type="button" data-rc-search>Chercher</button></div>' +
+        '<div id="rcResults"><span class="hint">Choisis un compte puis lance la recherche.</span></div>' +
+      '</div><footer>' +
+        '<button class="btn ghost" type="button" data-close>Annuler</button>' +
+      '</footer></aside>';
+  chargerComptesDrawer();
+  var champ = document.getElementById('rc-nom');
+  if (champ) champ.focus();
+}
+
+// Cree la fiche puis applique l'assignation prevue par le contexte.
+async function creerContactEtAssigner(participantID, accountID, nomContact){
+  var origine = contexteContact;
+  if (!origine) return;
+  var boutons = drawerHost.querySelectorAll('[data-rc-choose]');
+  Array.prototype.forEach.call(boutons, function(x){ x.disabled = true; });
+
+  var id = idPourNouveauContact(nomContact);
+  var r, data;
+  try {
+    r = await fetch('/api/personne', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({id: id, nom: nomContact, accountID: accountID,
+        participantID: participantID})
+    });
+    data = await r.json();
+  } catch (err) {
+    toast('Connexion au serveur impossible.');
+    Array.prototype.forEach.call(boutons, function(x){ x.disabled = false; });
+    return;
+  }
+  if (!r.ok) {
+    toast(messageErreurBeeper(r.status, data));
+    Array.prototype.forEach.call(boutons, function(x){ x.disabled = false; });
+    return;
+  }
+
+  contexteContact = null;
+  closeDrawer();
+  if (data.etat) etat = data.etat;
+  renderErrors();
+
+  if (origine.mode === 'editeur') {
+    // L'editeur complet est ouvert et porte peut-etre d'autres modifications non
+    // enregistrees : on ne le reconstruit pas. L'option est ajoutee a la liste
+    // vivante et selectionnee, la tache sera assignee a l'enregistrement.
+    var sel = document.getElementById('e-resp');
+    if (sel) {
+      var opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = nomContact;
+      sel.insertBefore(opt, sel.options[sel.options.length - 1]);
+      sel.value = id;
+      afficherRangee(document.getElementById('e-relance-row'), true);
+    }
+    toast('Contact ' + nomContact + ' ajouté.');
+    return;
+  }
+
+  if (origine.mode === 'cellule') {
+    renderAll();
+    await envoyerOps([{op: 'update_task', ref: origine.ref,
+      champs: {responsable: id}}]);
+    toast(origine.ref + ' assignée à ' + nomContact + '.');
+    return;
+  }
+
+  renderAll();
+  toast('Contact ' + nomContact + ' ajouté.');
 }
 
 function openResolveDrawer(ref){
@@ -1746,7 +1877,11 @@ document.addEventListener('click', function(e){
   if ((el = e.target.closest('[data-resolve]'))) { openResolveDrawer(el.getAttribute('data-resolve')); return; }
   if (e.target.closest('[data-rc-search]')) { chercherContactsDrawer(); return; }
   if ((el = e.target.closest('[data-rc-choose]'))) {
-    resoudreContact(el.getAttribute('data-rc-choose'), el.getAttribute('data-rc-account'),
+    // Deux origines pour le meme tiroir : une relance bloquee, qui attend un
+    // identifiant de fiche precis, ou une assignation en cours, qui cree la
+    // fiche de toutes pieces.
+    var choisir = contexteContact ? creerContactEtAssigner : resoudreContact;
+    choisir(el.getAttribute('data-rc-choose'), el.getAttribute('data-rc-account'),
       el.getAttribute('data-rc-nom'));
     return;
   }
@@ -1861,6 +1996,10 @@ async function saveEditor(projetId, n){
   var titre = titreEl.value.trim();
   if (!titre) { titreEl.focus(); toast('Il faut un intitulé'); return; }
   var responsable = document.getElementById('e-resp').value;
+  // Garde-fou : l'entree d'ajout de contact n'est pas un responsable. Elle est
+  // deja remise sur la valeur precedente par l'ecouteur de changement, ce test
+  // est la pour qu'aucun chemin detourne ne l'ecrive dans un fichier de projet.
+  if (responsable === VALEUR_NOUVEAU_CONTACT) responsable = 'moi';
   var champs = {
     titre: titre,
     responsable: responsable,
@@ -2023,6 +2162,16 @@ document.addEventListener('focusout', function(e){
 // pour la perte de focus, le resultat est identique.
 document.addEventListener('change', function(e){
   if (e.target && e.target.id === 'ie-champ' && e.target.tagName === 'SELECT') {
+    // L'entree d'ajout de contact est une action, jamais un responsable : elle
+    // ouvre le tiroir de recherche au lieu d'etre enregistree. La cellule quitte
+    // l'edition sans rien ecrire, l'assignation se fera quand le contact aura
+    // ete choisi (voir creerContactEtAssigner).
+    if (e.target.value === VALEUR_NOUVEAU_CONTACT && inlineEdit) {
+      var ref = projectById(inlineEdit.pid).prefixe + inlineEdit.n;
+      annulerEditionEnPlace();
+      ouvrirAjoutContact({mode: 'cellule', ref: ref});
+      return;
+    }
     if (inlineEdit) enregistrerCelluleTache();
     else if (inlineEditProjet) enregistrerCelluleProjet();
   }
@@ -2041,6 +2190,15 @@ function afficherRangee(el, visible){
 }
 document.addEventListener('change', function(e){
   if (e.target && e.target.id === 'e-resp') {
+    if (e.target.value === VALEUR_NOUVEAU_CONTACT) {
+      // On revient sur la valeur precedente : l'entree d'ajout est une action,
+      // jamais un responsable. Sans ce retour, annuler le tiroir laisserait la
+      // liste sur une valeur qui serait enregistree telle quelle.
+      e.target.value = e.target.getAttribute('data-avant') || 'moi';
+      ouvrirAjoutContact({mode: 'editeur'});
+      return;
+    }
+    e.target.setAttribute('data-avant', e.target.value);
     afficherRangee(document.getElementById('e-relance-row'), e.target.value !== 'moi');
   }
   if (e.target && e.target.id === 'pd-dom') {
