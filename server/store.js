@@ -3,12 +3,17 @@ const yaml = require('js-yaml');
 
 class InvalidProjectError extends Error {}
 
-const TASK_FIELDS = ['n', 'titre', 'statut', 'responsable', 'echeance',
+// Une tache n'a pas de statut. Cet outil ne contient que du travail a faire :
+// une tache terminee en sort, elle n'y reste pas marquee « fait ». Le seul etat
+// possible est donc « presente », et la seule facon de la clore est de la
+// supprimer, ce que font le bouton de suppression, la dictee et la synchro
+// WhatsApp.
+const TASK_FIELDS = ['n', 'titre', 'responsable', 'echeance',
   'nature_echeance', 'prio', 'effort', 'bloque_par', 'derniere_relance',
   'prochaine_relance', 'maj_le', 'note_blocage'];
 
 const TASK_DEFAULTS = {
-  titre: '', statut: 'a_faire', responsable: 'moi', echeance: '',
+  titre: '', responsable: 'moi', echeance: '',
   nature_echeance: 'souhaitee', prio: 'P3', effort: 'M', bloque_par: '',
   derniere_relance: '', prochaine_relance: '', maj_le: '', note_blocage: ''
 };
@@ -162,9 +167,13 @@ function addDays(iso, n) {
   return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate());
 }
 
+// Toutes les taches d'un projet sont ouvertes : le portefeuille ne contient que
+// du travail a faire. Cette fonction ne filtre donc plus rien, mais elle reste,
+// et elle reste utilisee partout. Elle nomme l'intention (« les taches sur
+// lesquelles il y a quelque chose a faire ») au lieu de la supposer, et c'est
+// elle qu'il faudra changer si un etat autre que « presente » revenait un jour.
 function openTasks(project) {
-  return (project.taches || []).filter(
-    (t) => t.statut !== 'fait' && t.statut !== 'abandonne');
+  return (project.taches || []).slice();
 }
 
 // Prochaine action d un projet : elle n est plus saisie a la main, elle se deduit
@@ -206,7 +215,6 @@ function signals(project, today) {
     sansProchaineAction: !prochaineAction(project) && !project.prochaine_action,
     dormant: ouvertes.length > 0 &&
       ouvertes.every((t) => !!t.maj_le && daysBetween(t.maj_le, today) < -30),
-    wipEleve: ouvertes.filter((t) => t.statut === 'en_cours').length >= 3,
     // Signal 6, en retard : fait acquis (echeance depassee), distinct d une relance
     // due qui reste une action a mener. Seule une echeance de tache de nature
     // "dure" compte ici, une echeance "souhaitee" n est qu une intention.
@@ -227,7 +235,6 @@ function severity(project, today) {
 }
 
 const DOMAINES = {
-  statut: ['a_faire', 'en_cours', 'bloque', 'fait', 'abandonne'],
   nature_echeance: ['dure', 'souhaitee'],
   prio: ['P1', 'P2', 'P3', 'P4'],
   effort: ['S', 'M', 'L']
@@ -242,7 +249,7 @@ const DOMAINES_PROJET = {
   domaine: ['side', 'perso', 'pro'],
   statut: ['actif', 'en_pause', 'termine', 'abandonne']
 };
-const CHAMPS_TACHE = ['titre', 'statut', 'responsable', 'echeance',
+const CHAMPS_TACHE = ['titre', 'responsable', 'echeance',
   'nature_echeance', 'prio', 'effort', 'bloque_par', 'derniere_relance',
   'prochaine_relance', 'note_blocage'];
 const CHAMPS_PROJET = ['titre', 'domaine', 'echeance', 'prochaine_action', 'statut', 'jira', 'dossier'];
@@ -322,12 +329,6 @@ function applyOps(projects, ops, today) {
         const mauvais = champsInvalides(champs);
         if (mauvais.length) return rejected.push('valeurs refusees : ' + mauvais.join(', '));
         if (!Object.keys(champs).length) return rejected.push('aucun champ a modifier');
-        // note_blocage n'est efface que si le statut fait explicitement partie des
-        // champs modifies par cette operation et que sa nouvelle valeur n'est plus
-        // bloque : une operation qui ne touche pas au statut laisse la note intacte.
-        if (Object.prototype.hasOwnProperty.call(champs, 'statut') && champs.statut !== 'bloque') {
-          champs.note_blocage = '';
-        }
         Object.assign(hit.task, champs, {maj_le: today});
         applied.push('~ ' + o.ref.toUpperCase() + '  ' + Object.keys(champs).join(', '));
 

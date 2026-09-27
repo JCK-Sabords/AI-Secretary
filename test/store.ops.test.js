@@ -9,7 +9,7 @@ function base() {
     id: 'estimmo', prefixe: 'ES', titre: 'Estimmo', domaine: 'side', statut: 'actif',
     echeance: '2026-10-15', prochaine_action: 'faire', jira: '', dernier_n: 2, contexte: '',
     taches: [
-      {n: 1, titre: 'a', statut: 'a_faire', responsable: 'moi', echeance: '',
+      {n: 1, titre: 'a', responsable: 'moi', echeance: '',
        nature_echeance: 'souhaitee', prio: 'P3', effort: 'M', bloque_par: '',
        derniere_relance: '', prochaine_relance: '', maj_le: '2026-09-01', note_blocage: ''}
     ]
@@ -30,11 +30,30 @@ test('add_task cree une tache et avance le compteur', () => {
 
 test('update_task ne touche que les champs fournis', () => {
   const r = store.applyOps(base(), [{op: 'update_task', ref: 'ES1',
-    champs: {statut: 'bloque'}}], AUJ);
+    champs: {prio: 'P1'}}], AUJ);
   const t = r.projects[0].taches[0];
-  assert.strictEqual(t.statut, 'bloque');
+  assert.strictEqual(t.prio, 'P1');
   assert.strictEqual(t.titre, 'a');
   assert.strictEqual(t.maj_le, AUJ);
+});
+
+// Une tache n'a pas de statut : cet outil ne contient que du travail a faire,
+// et une tache terminee en sort au lieu d'y rester marquee.
+test('update_task ignore un statut de tache, qui n existe plus', () => {
+  const r = store.applyOps(base(), [{op: 'update_task', ref: 'ES1',
+    champs: {statut: 'fait'}}], AUJ);
+  assert.strictEqual(r.applied.length, 0);
+  assert.deepStrictEqual(r.rejected, ['aucun champ a modifier']);
+  assert.strictEqual(r.projects[0].taches[0].statut, undefined);
+});
+
+test('add_task ne cree aucun statut de tache', () => {
+  const r = store.applyOps(base(), [{op: 'add_task', projet: 'estimmo',
+    titre: 'neuve', statut: 'en_cours'}], AUJ);
+  assert.strictEqual(r.applied.length, 1);
+  const t = r.projects[0].taches[r.projects[0].taches.length - 1];
+  assert.strictEqual(t.titre, 'neuve');
+  assert.strictEqual(t.statut, undefined);
 });
 
 test('delete_task retire la tache sans liberer le numero', () => {
@@ -69,10 +88,10 @@ test('une reference inexistante est refusee', () => {
 
 test('une valeur hors domaine est refusee', () => {
   const r = store.applyOps(base(), [{op: 'update_task', ref: 'ES1',
-    champs: {statut: 'peut_etre'}}], AUJ);
+    champs: {prio: 'P9'}}], AUJ);
   assert.strictEqual(r.applied.length, 0);
   assert.strictEqual(r.rejected.length, 1);
-  assert.strictEqual(r.projects[0].taches[0].statut, 'a_faire');
+  assert.strictEqual(r.projects[0].taches[0].prio, 'P3');
 });
 
 test('applyOps ne mute pas le tableau recu', () => {
@@ -102,29 +121,15 @@ test('update_task ne touche pas note_blocage quand le statut n est pas modifie',
   const r = store.applyOps(projets, [{op: 'update_task', ref: 'ES1',
     champs: {prio: 'P1'}}], AUJ);
   const t = r.projects[0].taches[0];
-  assert.strictEqual(t.statut, 'bloque');
   assert.strictEqual(t.note_blocage, 'attente devis notaire');
 });
 
-test('note_blocage est efface quand le statut passe explicitement de bloque a autre chose', () => {
+test('note_blocage est conserve par une modification qui ne le vise pas', () => {
   const projets = base();
-  projets[0].taches[0].statut = 'bloque';
-  projets[0].taches[0].note_blocage = 'attente devis notaire';
-  const r = store.applyOps(projets, [{op: 'update_task', ref: 'ES1',
-    champs: {statut: 'en_cours'}}], AUJ);
-  const t = r.projects[0].taches[0];
-  assert.strictEqual(t.statut, 'en_cours');
-  assert.strictEqual(t.note_blocage, '');
-});
-
-test('note_blocage est conserve quand l operation ne modifie pas le statut', () => {
-  const projets = base();
-  projets[0].taches[0].statut = 'bloque';
   projets[0].taches[0].note_blocage = 'attente devis notaire';
   const r = store.applyOps(projets, [{op: 'update_task', ref: 'ES1',
     champs: {responsable: 'christian'}}], AUJ);
   const t = r.projects[0].taches[0];
-  assert.strictEqual(t.statut, 'bloque');
   assert.strictEqual(t.note_blocage, 'attente devis notaire');
 });
 
@@ -289,7 +294,7 @@ function deuxProjets() {
       id: 'estimmo', prefixe: 'ES', titre: 'Estimmo', domaine: 'side', statut: 'actif',
       echeance: '2026-10-15', prochaine_action: 'faire', jira: '', dernier_n: 2, contexte: '',
       taches: [
-        {n: 1, titre: 'a', statut: 'a_faire', responsable: 'moi', echeance: '',
+        {n: 1, titre: 'a', responsable: 'moi', echeance: '',
          nature_echeance: 'souhaitee', prio: 'P3', effort: 'M', bloque_par: '',
          derniere_relance: '', prochaine_relance: '', maj_le: '2026-09-01', note_blocage: ''},
         {n: 2, titre: 'b', statut: 'en_cours', responsable: 'moi', echeance: '',
@@ -375,7 +380,7 @@ function baseMulti() {
     {id: 'estimmo', prefixe: 'ES', titre: 'Estimmo', domaine: 'side', statut: 'actif',
      echeance: '', prochaine_action: '', jira: '', dernier_n: 3, ordre: 0, contexte: '',
      taches: [
-       {n: 1, titre: 'a', statut: 'a_faire', responsable: 'moi', echeance: '',
+       {n: 1, titre: 'a', responsable: 'moi', echeance: '',
         nature_echeance: 'souhaitee', prio: 'P3', effort: 'M', bloque_par: '',
         derniere_relance: '', prochaine_relance: '', maj_le: '', note_blocage: ''},
        {n: 2, titre: 'b', statut: 'a_faire', responsable: 'moi', echeance: '',

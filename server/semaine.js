@@ -43,7 +43,6 @@ function tachesPourPrompt(projects, today) {
         projet: p.id,
         projetTitre: p.titre,
         domaine: p.domaine,
-        statut: t.statut,
         prio: t.prio,
         effort: t.effort,
         echeance: t.echeance,

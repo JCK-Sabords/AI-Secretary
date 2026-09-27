@@ -203,7 +203,11 @@ td.date.none{color:var(--muted)}
 /* ---------- niveau 2 ---------- */
 .sub-row > td{padding:0;background:var(--surface-2);border-bottom:1px solid var(--rule)}
 .tasks{padding:4px 14px 16px 30px}
-.grid8{display:grid;grid-template-columns:16px 56px 1fr 104px 116px 96px 46px 58px;gap:12px;align-items:center}
+/* Sept colonnes depuis le retrait du statut : poignee, reference, intitule,
+   responsable, echeance, priorite, actions, chevron. Le nom de la classe est
+   conserve, il est porte par une vingtaine d'endroits et ne designe pas un
+   nombre de colonnes mais cette grille-la. */
+.grid8{display:grid;grid-template-columns:16px 56px 1fr 116px 96px 46px 58px;gap:12px;align-items:center}
 .tasks .hd{padding:8px;font-size:10px;font-weight:700;letter-spacing:var(--sc-label);
   text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--rule)}
 .task{padding:9px 8px;border-bottom:1px solid var(--rule-soft)}
@@ -235,7 +239,6 @@ td.date.none{color:var(--muted)}
   background:transparent;color:var(--ink-2);cursor:pointer;font-size:14px;line-height:1;padding:0;flex:none}
 .addtask-btn:hover{background:var(--surface-2);color:var(--ink)}
 .prow.dragover{outline:2px dashed var(--accent);outline-offset:-2px}
-.task.done .ttl{color:var(--muted);text-decoration:line-through}
 .ref{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--ink-2)}
 .ttl{font-size:15px;color:var(--ink);font-weight:500}
 .pill{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 7px;
@@ -506,7 +509,6 @@ function echeanceRelative(iso, today){
 function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 
-var STATUT = {a_faire:'À faire', en_cours:'En cours', bloque:'Bloqué', fait:'Fait', abandonne:'Abandonné'};
 
 function refOf(p, t){ return p.prefixe + t.n; }
 function projectById(id){
@@ -557,7 +559,7 @@ function respHtml(responsable){
 function dateHtml(t){
   if (t.echeance === '') return '<span class="tdate soft">sans date</span>';
   var r = echeanceRelative(t.echeance, etat.today);
-  var classe = (r.classe === 'late' && t.statut !== 'fait') ? 'late'
+  var classe = r.classe === 'late' ? 'late'
     : (t.nature_echeance === 'souhaitee' ? 'soft' : r.classe);
   return '<span class="tdate ' + classe + '" title="' + esc(frDate(t.echeance)) + '">' +
     esc(r.texte) + '</span>';
@@ -575,10 +577,6 @@ function celluleTache(p, t, champ, affichageHtml){
     if (champ === 'titre') {
       return '<input type="text" class="' + cls.trim() + '" id="ie-champ" ' + attrsSauv +
         ' value="' + esc(t.titre) + '"' + (inlineSaving ? ' disabled' : '') + '>';
-    }
-    if (champ === 'statut') {
-      return '<select class="' + cls.trim() + '" id="ie-champ" ' + attrsSauv + (inlineSaving ? ' disabled' : '') + '>' +
-        opts(STATUT, t.statut) + '</select>';
     }
     if (champ === 'prio') {
       return '<select class="' + cls.trim() + '" id="ie-champ" ' + attrsSauv + (inlineSaving ? ' disabled' : '') + '>' +
@@ -599,14 +597,11 @@ function celluleTache(p, t, champ, affichageHtml){
   return '<span class="cell" data-cell="' + esc(p.id) + ':' + t.n + ':' + champ + '">' + affichageHtml + '</span>';
 }
 function taskHtml(p, t){
-  var doneCls = (t.statut === 'fait' || t.statut === 'abandonne') ? ' done' : '';
   var ref = refOf(p, t);
-  return '<div class="task grid8' + doneCls + '" data-ref="' + esc(ref) + '" data-pid="' + esc(p.id) + '" data-n="' + t.n + '">' +
+  return '<div class="task grid8" data-ref="' + esc(ref) + '" data-pid="' + esc(p.id) + '" data-n="' + t.n + '">' +
     '<span class="handle" draggable="true" data-drag-task="' + esc(p.id) + ':' + t.n + '" title="Glisser pour réordonner">⋮⋮</span>' +
     '<span class="ref">' + esc(ref) + '</span>' +
     celluleTache(p, t, 'titre', '<span class="ttl">' + esc(t.titre) + '</span>') +
-    celluleTache(p, t, 'statut', '<span class="pill ' + esc(t.statut.replace('_', '')) + '">' +
-      esc(STATUT[t.statut] || t.statut) + '</span>') +
     celluleTache(p, t, 'responsable', respHtml(t.responsable)) +
     celluleTache(p, t, 'echeance', dateHtml(t)) +
     celluleTache(p, t, 'prio', '<span class="prio ' + esc(t.prio.toLowerCase()) + '">' + esc(t.prio) + '</span>') +
@@ -655,7 +650,7 @@ function slugifyId(titre){
 }
 function editorHtml(p, t){
   var isNew = !t;
-  t = t || {n:0, titre:'', statut:'a_faire', responsable:'moi', echeance:'',
+  t = t || {n:0, titre:'', responsable:'moi', echeance:'',
     nature_echeance:'souhaitee', prio:'P3', effort:'M', derniere_relance:'', prochaine_relance:''};
   var respMap = {moi:'Moi'};
   etat.people.forEach(function(per){ respMap[per.id] = per.nom; });
@@ -678,8 +673,6 @@ function editorHtml(p, t){
         '<input type="text" id="e-titre" value="' + esc(t.titre) + '" placeholder="Que faut-il faire ?"></div>' +
     '</div>' +
     '<div class="erow">' +
-      '<div class="f"><label class="k" for="e-st">Statut</label>' +
-        '<select id="e-st">' + opts(STATUT, t.statut) + '</select></div>' +
       '<div class="f"><label class="k" for="e-resp">Responsable</label>' +
         '<select id="e-resp">' + opts(respMap, t.responsable) + '</select></div>' +
       '<div class="f"><label class="k" for="e-ech">Échéance</label>' +
@@ -718,7 +711,7 @@ function tasksHtml(p){
   // ligne de projet, le second par le bouton rond d'edition complete de cette
   // meme ligne (voir renderBoard).
   return '<div class="tasks">' +
-    '<div class="hd grid8"><span></span><span>Réf.</span><span>Tâche</span><span>Statut</span>' +
+    '<div class="hd grid8"><span></span><span>Réf.</span><span>Tâche</span>' +
       '<span>Responsable</span><span>Échéance</span><span>Prio</span><span></span></div>' +
     body + (creating ? editorHtml(p, null) : '') +
   '</div>';
@@ -761,7 +754,10 @@ function celluleProjet(p, champ, affichageHtml, classe){
 // affiche en P1 pour toujours. Si toutes les taches sont closes, aucune
 // priorite n'est affichee. Le nombre, lui, compte bien toutes les taches
 // associees.
-function tacheOuverte(t){ return t.statut !== 'fait' && t.statut !== 'abandonne'; }
+// Toutes les taches du portefeuille sont a faire : une tache terminee en sort,
+// elle n'y reste pas marquee. La fonction est conservee pour nommer l'intention
+// aux endroits qui s'en servent.
+function tacheOuverte(t){ return !!t; }
 function prioMaxProjet(p){
   var rang = {P1: 1, P2: 2, P3: 3, P4: 4};
   var meilleur = '';
@@ -1840,7 +1836,6 @@ async function saveEditor(projetId, n){
   var responsable = document.getElementById('e-resp').value;
   var champs = {
     titre: titre,
-    statut: document.getElementById('e-st').value,
     responsable: responsable,
     echeance: document.getElementById('e-ech').value,
     nature_echeance: document.getElementById('e-nat').value,
@@ -1995,7 +1990,7 @@ document.addEventListener('focusout', function(e){
     else if (inlineEditProjet) enregistrerCelluleProjet();
   }
 });
-// Les listes deroulantes (statut, priorite, responsable) enregistrent des le
+// Les listes deroulantes (priorite, responsable) enregistrent des le
 // choix (evenement "change"), sans attendre une perte de focus qui, en pratique,
 // suit immediatement le choix au clavier comme a la souris ; meme fonction que
 // pour la perte de focus, le resultat est identique.

@@ -92,6 +92,12 @@ function appliquer(ops, ctx) {
     // jamais etre efface par cet appel, meme s il n est pas dans res.projects.
     repo.saveAll(ctx.projectsDir, res.projects, projects.map((p) => p.id));
     commitOk = repo.commit(ctx.dataDir, 'data: ' + res.applied.join(' | '));
+    // Toute ecriture appliquee peut changer la liste que le proprietaire garde
+    // sur son telephone : suppression, renommage, changement de priorite, ou
+    // simple reordonnancement. La republication est programmee ici plutot que
+    // laissee a la tache horaire, et elle ne partira que si la liste a
+    // reellement change (voir listeSortante.publier).
+    listeSortante.planifierPublication(ctx);
   }
   return {status: 200,
     json: {applied: res.applied, rejected: res.rejected, etat: etat(ctx), commit: commitOk}};

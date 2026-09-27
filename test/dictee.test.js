@@ -95,38 +95,37 @@ test('construirePrompt n inclut pas le corps de contexte des projets', () => {
   assert.ok(!p.includes('notes privees et tres longues'));
 });
 
-test('construirePrompt n inclut pas les taches deja closes (fait, abandonne)', () => {
+// Une tache n'a pas de statut : toutes celles du portefeuille sont a faire et
+// partent donc au modele. Le prompt le lui dit explicitement, pour qu'il ne
+// cherche pas a en clore une en changeant un champ qui n'existe plus.
+test('construirePrompt envoie toutes les taches et interdit un statut de tache', () => {
   const projets = projetsExemple();
   projets[0].taches.push(
-    {n: 2, titre: 'tache terminee', statut: 'fait', responsable: 'moi', echeance: '',
-     nature_echeance: 'souhaitee', prio: 'P3', effort: 'M', bloque_par: '',
-     derniere_relance: '', prochaine_relance: '', maj_le: '2026-09-01', note_blocage: ''},
-    {n: 3, titre: 'tache abandonnee', statut: 'abandonne', responsable: 'moi', echeance: '',
+    {n: 2, titre: 'seconde tache', responsable: 'moi', echeance: '',
      nature_echeance: 'souhaitee', prio: 'P3', effort: 'M', bloque_par: '',
      derniere_relance: '', prochaine_relance: '', maj_le: '2026-09-01', note_blocage: ''});
   const p = dictee.construirePrompt(projets, personnesExemple(), 'salut', '2026-09-07', 'Alex');
-  assert.ok(!p.includes('tache terminee'));
-  assert.ok(!p.includes('tache abandonnee'));
-  assert.ok(p.includes('contacter le notaire'), 'la tache ouverte doit rester presente');
+  assert.ok(p.includes('contacter le notaire'));
+  assert.ok(p.includes('seconde tache'));
+  assert.ok(p.includes("Une tache n'a pas de statut"));
+  assert.ok(p.includes('delete_task'));
 });
 
 // Le portefeuille volumineux ci-dessous ne tiendrait pas sous la limite si les
-// projets sans tache ouverte (contexte volumineux, taches toutes fait) n'etaient
-// pas retires en priorite : ce test verifie a la fois la limite et la priorite.
+// projets sans aucune tache (contexte volumineux) n'etaient pas retires en
+// priorite : ce test verifie a la fois la limite et la priorite.
 test('construirePrompt reste sous la limite de taille sur un portefeuille volumineux', () => {
   function projetFerme(i) {
     return {id: 'ferme' + i, prefixe: 'F' + i, titre: 'Projet ferme ' + i, domaine: 'side',
       statut: 'actif', echeance: '', prochaine_action: '', jira: '', dernier_n: 1,
       contexte: 'vieilles notes '.repeat(80),
-      taches: [{n: 1, titre: 'ancienne tache', statut: 'fait', responsable: 'moi', echeance: '',
-        nature_echeance: 'souhaitee', prio: 'P3', effort: 'M', bloque_par: '',
-        derniere_relance: '', prochaine_relance: '', maj_le: '2026-01-01', note_blocage: ''}]};
+      taches: []};
   }
   function projetActif(i) {
     return {id: 'actif' + i, prefixe: 'A' + i, titre: 'Projet actif ' + i, domaine: 'side',
       statut: 'actif', echeance: '', prochaine_action: 'faire', jira: '', dernier_n: 1,
       contexte: '',
-      taches: [{n: 1, titre: 'tache ouverte ' + i, statut: 'a_faire', responsable: 'moi',
+      taches: [{n: 1, titre: 'tache ouverte ' + i, responsable: 'moi',
         echeance: '', nature_echeance: 'souhaitee', prio: 'P3', effort: 'M', bloque_par: '',
         derniere_relance: '', prochaine_relance: '', maj_le: '2026-09-01', note_blocage: ''}]};
   }

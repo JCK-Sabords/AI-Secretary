@@ -52,7 +52,6 @@ function construireInstantane(dataDir, today) {
       taches: store.openTasks(p).map((t) => ({
         ref: store.refOf(p, t),
         titre: t.titre,
-        statut: t.statut,
         echeance: t.echeance,
         nature_echeance: t.nature_echeance,
         prio: t.prio

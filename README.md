@@ -200,7 +200,10 @@ Toutes ecrivent dans les memes fichiers de `data/projects/` et `data/people.md`.
    `Secretariat - liste WhatsApp` (`npm run publier-liste`, `outils/publier-liste.js`) republie
    dans la conversation `filTachesWhatsApp` la liste complete des taches ouvertes, classee par
    priorite, chacune en huit mots au plus, au format a puces de la liste manuscrite. Rien n'est
-   envoye si la liste deja presente designe les memes taches dans le meme ordre. La destination
+   envoye si la liste deja presente designe les memes taches dans le meme ordre. Toute ecriture
+   appliquee (suppression, renommage, changement de priorite, reordonnancement) programme aussi
+   une republication, quinze secondes apres la derniere, de sorte qu'une rafale de
+   modifications ne produise qu'un seul message ; la tache horaire n'est plus qu'un filet. La destination
    vient uniquement de `data/config.json`, jamais du corps d'une requete ni d'une reponse de
    Claude. `GET /api/liste-sortante` montre le message sans l'envoyer,
    `POST /api/liste-sortante/publier` declenche la publication.
@@ -222,8 +225,9 @@ Toutes ecrivent dans les memes fichiers de `data/projects/` et `data/people.md`.
    seul calcul. Les echeances s'affichent partout en delai (« dans 6 j », « en
    retard de 3 j »), la date exacte restant en infobulle, sauf au-dela de trente jours ou la
    date reprend la main. S'y ajoutent un formulaire d'edition en place pour les taches
-   (titre, statut, responsable, echeance, nature, priorite, effort, plus les deux champs de
-   relance decrits plus bas), et un tiroir de projet pour creer ou modifier un projet (titre,
+   (titre, responsable, echeance, nature, priorite, effort, plus les deux champs de
+   relance decrits plus bas ; une tache n'a pas de statut, cet outil ne contient que du travail
+   a faire et la clore signifie la supprimer), et un tiroir de projet pour creer ou modifier un projet (titre,
    domaine, echeance, prochaine action, reference de ticket si le domaine est `pro`), ouvert
    depuis le bouton « Nouveau projet » du portefeuille ou « Modifier le projet » sur une ligne
    depliee. En creation, l'identifiant de fichier est calcule depuis le titre (minuscules,
@@ -268,9 +272,9 @@ Toutes ecrivent dans les memes fichiers de `data/projects/` et `data/people.md`.
 
    Sur chaque ligne de tache : une poignee (`⋮⋮`) glisser-deposer pour reordonner les taches
    d'un projet (et, de la meme facon, les projets entre eux) ; un clic sur une cellule visible
-   (titre, statut, responsable, echeance) l'ouvre en edition en place, enregistree a la perte
+   (titre, responsable, echeance) l'ouvre en edition en place, enregistree a la perte
    du focus ou a la selection dans une liste deroulante, Entree validant un champ texte et
-   Echap annulant sans rien envoyer. Pour les champs a choix (statut, priorite, responsable)
+   Echap annulant sans rien envoyer. Pour les champs a choix (priorite, responsable)
    et pour l'echeance, la liste deroulante ou le calendrier se deploie des le premier clic,
    sans avoir a cliquer une seconde fois ; un bouton crayon (« Edition complete ») ouvre le meme
    formulaire complet que pour une nouvelle tache, seul moyen de modifier l'effort et la nature

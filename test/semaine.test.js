@@ -13,7 +13,7 @@ function projet(id, prefixe, titre, taches, extra) {
     prochaine_action: '', jira: '', dernier_n: (taches || []).length, ordre: 0,
     contexte: '',
     taches: (taches || []).map((t, i) => Object.assign({
-      n: i + 1, statut: 'a_faire', responsable: 'moi', echeance: '',
+      n: i + 1, responsable: 'moi', echeance: '',
       nature_echeance: 'souhaitee', prio: 'P3', effort: 'M', bloque_par: '',
       derniere_relance: '', prochaine_relance: '', maj_le: '', note_blocage: ''
     }, t))
@@ -115,9 +115,9 @@ test('interpreter encaisse une reponse vide, nulle ou mal formee', () => {
   });
 });
 
-test('tachesPourPrompt met les taches a plat, sans les closes', () => {
+test('tachesPourPrompt met les taches a plat, en ignorant les projets vides', () => {
   const taches = semaine.tachesPourPrompt([
-    projet('topi', 'TO', 'TOPI', [{titre: 'ouverte'}, {titre: 'finie', statut: 'fait'}]),
+    projet('topi', 'TO', 'TOPI', [{titre: 'ouverte'}]),
     projet('vide', 'VI', 'Projet vide', [])
   ], '2026-09-25');
   assert.deepStrictEqual(taches.map((t) => t.ref), ['TO1']);
@@ -135,10 +135,9 @@ test('tachesPourPrompt signale une tache en retard sans jamais lever', () => {
   assert.deepStrictEqual(taches.map((t) => t.en_retard), [true, false, false]);
 });
 
-test('calculer ne soumet que les taches ouvertes', () => {
+test('calculer ne soumet que les projets qui portent des taches', () => {
   const ctx = contexte([
     projet('vide', 'VI', 'Projet vide', []),
-    projet('clos', 'CL', 'Projet clos', [{titre: 'finie', statut: 'fait'}]),
     projet('actif', 'AC', 'Projet actif', [{titre: 'a faire'}])
   ]);
   let promptVu = '';
@@ -148,8 +147,7 @@ test('calculer ne soumet que les taches ouvertes', () => {
   };
   return semaine.calculer(ctx, {lancerClaude: faux}).then((r) => {
     assert.deepStrictEqual(r.top.map((x) => x.ref), ['AC1']);
-    assert.ok(!promptVu.includes('finie'), 'une tache close ne part pas au modele');
-    assert.ok(!promptVu.includes('Projet vide'), 'un projet sans tache ouverte non plus');
+    assert.ok(!promptVu.includes('Projet vide'), 'un projet sans tache ne part pas au modele');
   });
 });
 

@@ -44,7 +44,16 @@ test('parseProject lit les metadonnees du projet', () => {
   assert.strictEqual(p.echeance, '2026-10-15');
   assert.strictEqual(p.taches.length, 1);
   assert.strictEqual(p.taches[0].n, 1);
-  assert.strictEqual(p.taches[0].statut, 'en_cours');
+  assert.strictEqual(p.taches[0].prio, 'P2');
+});
+
+// Les fichiers ecrits avant le retrait du statut de tache en portent encore un.
+// Il doit etre ignore au chargement, jamais recopie a l'ecriture : le champ
+// n'existe plus, un fichier ancien doit simplement s'en debarrasser.
+test('parseProject ignore un statut de tache herite d un ancien fichier', () => {
+  const p = store.parseProject(FIXTURE);
+  assert.strictEqual(p.taches[0].statut, undefined);
+  assert.ok(!store.serializeProject(p).includes('statut: en_cours'));
 });
 
 test('parseProject conserve le corps du fichier', () => {

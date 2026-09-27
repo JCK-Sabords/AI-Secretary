@@ -35,13 +35,14 @@ function erreur(cause, message) {
 // Allege un projet avant de l'envoyer dans le prompt : retire le corps de contexte
 // (texte libre, parfois long, qu'aucune des six operations ne lit ni ne modifie) et
 // les taches deja closes (fait, abandonne), qu'aucune operation courante ne cible
-// non plus. Les autres champs (id, prefixe, titre, domaine, statut, echeance,
+// non plus. Les autres champs (id, prefixe, titre, domaine, statut de projet, echeance,
 // prochaine_action, jira, dernier_n) sont conserves tels quels.
 function allegerProjetPourPrompt(p) {
   const allege = Object.assign({}, p);
   delete allege.contexte;
-  allege.taches = (p.taches || []).filter(
-    (t) => t.statut !== 'fait' && t.statut !== 'abandonne');
+  // Toutes les taches sont ouvertes : une tache n'a plus de statut, elle est
+  // presente ou elle n'existe plus.
+  allege.taches = (p.taches || []).slice();
   return allege;
 }
 
@@ -94,8 +95,10 @@ function construirePrompt(projects, people, texte, today, proprietaire) {
       "Demande de l'utilisateur a transformer en operations : " + texte,
       '',
       'Tu ne peux produire que les six operations suivantes, chacune avec exactement ces champs :',
-      '- add_task : {op, projet, titre, statut, responsable, echeance, nature_echeance, prio, ' +
+      '- add_task : {op, projet, titre, responsable, echeance, nature_echeance, prio, ' +
         'effort, bloque_par, derniere_relance, prochaine_relance, note_blocage}',
+      "  Une tache n'a pas de statut : cet outil ne contient que du travail a faire. Pour " +
+        'clore une tache terminee, utilise delete_task.',
       '- update_task : {op, ref, champs: {les memes champs de tache que ci-dessus, ' +
         'uniquement ceux a modifier}}',
       '- delete_task : {op, ref}',
@@ -110,8 +113,8 @@ function construirePrompt(projects, people, texte, today, proprietaire) {
         'prochaine action d un projet qui a des taches, agis sur les taches (priorite ou ' +
         'creation), pas sur ce champ.',
       '',
-      'Valeurs fermees a respecter strictement : statut de tache parmi a_faire, en_cours, bloque, ' +
-        'fait, abandonne ; nature_echeance parmi dure, souhaitee ; prio parmi P1, P2, P3, P4 ; ' +
+      'Valeurs fermees a respecter strictement : ' +
+        'nature_echeance parmi dure, souhaitee ; prio parmi P1, P2, P3, P4 ; ' +
         'effort parmi S, M, L ; domaine de projet parmi side, perso, pro. Les dates sont au ' +
         'format AAAA-MM-JJ ou une chaine vide.',
       '',
@@ -122,7 +125,7 @@ function construirePrompt(projects, people, texte, today, proprietaire) {
       // retenue, dans une tache comme dans le message de reponse.
       "Regle de confidentialite imperative : pour un projet du domaine pro, n'ecris jamais de " +
         "detail metier, ni dans une tache que tu crees ou modifies ni dans le champ message de ta " +
-        "reponse. Limite-toi au titre, au statut et a l'echeance ; aucune prochaine action " +
+        "reponse. Limite-toi au titre et a l'echeance ; aucune prochaine action " +
         "detaillee, aucune note de blocage, aucun contenu au-dela d'un intitule minimal. C'est une " +
         "donnee employeur sur un disque personnel.",
       '',

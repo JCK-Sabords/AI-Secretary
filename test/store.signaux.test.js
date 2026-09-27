@@ -13,7 +13,7 @@ function projet(over) {
 }
 function tache(over) {
   return Object.assign({
-    n: 1, titre: 't', statut: 'a_faire', responsable: 'moi', echeance: '',
+    n: 1, titre: 't', responsable: 'moi', echeance: '',
     nature_echeance: 'souhaitee', prio: 'P3', effort: 'M', bloque_par: '',
     derniere_relance: '', prochaine_relance: '', maj_le: AUJ, note_blocage: ''
   }, over);
@@ -42,11 +42,12 @@ test('daysBetween traverse les mois, les annees et les annees bissextiles', () =
   assert.strictEqual(store.daysBetween('2023-03-01', '2023-02-28'), 1);
 });
 
-test('openTasks exclut fait et abandonne', () => {
-  const p = projet({taches: [
-    tache({n: 1, statut: 'fait'}), tache({n: 2, statut: 'abandonne'}),
-    tache({n: 3, statut: 'en_cours'})]});
-  assert.strictEqual(store.openTasks(p).length, 1);
+// Une tache n'a plus de statut : toutes celles du portefeuille sont a faire.
+// openTasks ne filtre donc plus rien, et c'est ce que ce test fixe.
+test('openTasks rend toutes les taches du projet', () => {
+  const p = projet({taches: [tache({n: 1}), tache({n: 2}), tache({n: 3})]});
+  assert.strictEqual(store.openTasks(p).length, 3);
+  assert.strictEqual(store.openTasks(projet({taches: []})).length, 0);
 });
 
 test('signal 1 : relance due quand la date est atteinte', () => {
@@ -72,9 +73,9 @@ test('signal 3 : sans prochaine action seulement si aucune tache ouverte et cham
   assert.strictEqual(store.signals(projet({prochaine_action: '',
     taches: [tache({})]}), AUJ).sansProchaineAction, false);
   assert.strictEqual(store.signals(projet({prochaine_action: '',
-    taches: [tache({statut: 'fait'})]}), AUJ).sansProchaineAction, true);
+    taches: []}), AUJ).sansProchaineAction, true);
   assert.strictEqual(store.signals(projet({prochaine_action: 'faire un truc',
-    taches: [tache({statut: 'fait'})]}), AUJ).sansProchaineAction, false);
+    taches: []}), AUJ).sansProchaineAction, false);
 });
 
 test('prochaineAction : la tache ouverte la plus prioritaire', () => {
@@ -93,18 +94,8 @@ test('prochaineAction : a priorite egale, la premiere de la liste', () => {
   assert.strictEqual(store.prochaineAction(p).n, 2);
 });
 
-test('prochaineAction : ignore les taches faites ou abandonnees', () => {
-  const p = projet({taches: [
-    tache({n: 1, titre: 'terminee', prio: 'P1', statut: 'fait'}),
-    tache({n: 2, titre: 'laissee', prio: 'P1', statut: 'abandonne'}),
-    tache({n: 3, titre: 'reste', prio: 'P4'})]});
-  assert.strictEqual(store.prochaineAction(p).n, 3);
-});
-
-test('prochaineAction : null quand aucune tache ouverte', () => {
+test('prochaineAction : null quand le projet ne porte aucune tache', () => {
   assert.strictEqual(store.prochaineAction(projet({taches: []})), null);
-  assert.strictEqual(
-    store.prochaineAction(projet({taches: [tache({statut: 'fait'})]})), null);
 });
 
 test('signal 4 : dormant si toutes les taches ouvertes depassent 30 jours', () => {
@@ -116,18 +107,8 @@ test('signal 4 : dormant si toutes les taches ouvertes depassent 30 jours', () =
   assert.strictEqual(store.signals(vivant, AUJ).dormant, false);
 });
 
-test('signal 5 : WIP eleve a partir de trois taches en cours', () => {
-  const trois = projet({taches: [tache({n: 1, statut: 'en_cours'}),
-    tache({n: 2, statut: 'en_cours'}), tache({n: 3, statut: 'en_cours'})]});
-  assert.strictEqual(store.signals(trois, AUJ).wipEleve, true);
-  const deux = projet({taches: [tache({n: 1, statut: 'en_cours'}),
-    tache({n: 2, statut: 'en_cours'})]});
-  assert.strictEqual(store.signals(deux, AUJ).wipEleve, false);
-});
-
-test('severity idle quand plus aucune tache ouverte', () => {
-  assert.strictEqual(store.severity(projet({prochaine_action: '',
-    taches: [tache({statut: 'fait'})]}), AUJ), 'idle');
+test('severity idle quand le projet ne porte aucune tache', () => {
+  assert.strictEqual(store.severity(projet({prochaine_action: '', taches: []}), AUJ), 'idle');
 });
 
 test('severity crit prime sur warn', () => {
@@ -167,15 +148,8 @@ test('signal 6 : tache ouverte a echeance souhaitee depassee ne declenche pas en
   assert.strictEqual(store.severity(p, AUJ), 'ok');
 });
 
-test('signal 6 : tache depassee mais au statut fait ne declenche pas en retard', () => {
-  const p = projet({echeance: '', taches: [
-    tache({echeance: '2026-09-01', nature_echeance: 'dure', statut: 'fait'}),
-    tache({n: 2})]});
-  assert.strictEqual(store.signals(p, AUJ).enRetard, false);
-});
-
-test('signal 6 : projet sans aucune tache ouverte reste idle meme avec echeance largement depassee', () => {
-  const p = projet({echeance: '2026-01-01', taches: [tache({statut: 'fait'})]});
+test('signal 6 : projet sans aucune tache reste idle meme avec echeance largement depassee', () => {
+  const p = projet({echeance: '2026-01-01', taches: []});
   assert.strictEqual(store.signals(p, AUJ).enRetard, false);
   assert.strictEqual(store.severity(p, AUJ), 'idle');
 });

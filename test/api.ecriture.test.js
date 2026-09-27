@@ -13,7 +13,7 @@ function contexte() {
   repo.saveProject(projectsDir, {id: 'demo', prefixe: 'DE', titre: 'Demo',
     domaine: 'side', statut: 'actif', echeance: '', prochaine_action: 'faire',
     jira: '', dernier_n: 1, contexte: '',
-    taches: [{n: 1, titre: 'a', statut: 'a_faire', responsable: 'moi', echeance: '',
+    taches: [{n: 1, titre: 'a', responsable: 'moi', echeance: '',
       nature_echeance: 'souhaitee', prio: 'P3', effort: 'M', bloque_par: '',
       derniere_relance: '', prochaine_relance: '', maj_le: '2026-09-01',
       note_blocage: ''}]});
@@ -66,7 +66,7 @@ test('POST /api/ops refuse une operation invalide sans rien ecrire', async () =>
 test('POST /api/tache sans numero cree la tache', async () => {
   const ctx = contexte();
   const r = await api.handle({method: 'POST', url: '/api/tache'},
-    {projet: 'demo', champs: {titre: 'creee', statut: 'en_cours'}}, ctx);
+    {projet: 'demo', champs: {titre: 'creee', prio: 'P1'}}, ctx);
   assert.strictEqual(r.status, 200);
   assert.strictEqual(repo.loadAll(ctx.projectsDir)[0].taches.length, 2);
 });
@@ -74,8 +74,8 @@ test('POST /api/tache sans numero cree la tache', async () => {
 test('POST /api/tache avec une reference met a jour', async () => {
   const ctx = contexte();
   await api.handle({method: 'POST', url: '/api/tache'},
-    {ref: 'DE1', champs: {statut: 'fait'}}, ctx);
-  assert.strictEqual(repo.loadAll(ctx.projectsDir)[0].taches[0].statut, 'fait');
+    {ref: 'DE1', champs: {prio: 'P1'}}, ctx);
+  assert.strictEqual(repo.loadAll(ctx.projectsDir)[0].taches[0].prio, 'P1');
 });
 
 test('DELETE /api/tache supprime', async () => {

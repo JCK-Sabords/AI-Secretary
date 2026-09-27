@@ -19,7 +19,7 @@ function projet(id, prefixe, titre, taches) {
     prochaine_action: '', jira: '', dossier: '', dernier_n: (taches || []).length,
     ordre: 0, contexte: '',
     taches: (taches || []).map((t, i) => Object.assign({
-      n: i + 1, statut: 'a_faire', responsable: 'moi', echeance: '',
+      n: i + 1, responsable: 'moi', echeance: '',
       nature_echeance: 'souhaitee', prio: 'P3', effort: 'M', bloque_par: '',
       derniere_relance: '', prochaine_relance: '', maj_le: '', note_blocage: ''
     }, t))
@@ -128,9 +128,9 @@ test('interpreter retombe sur l intitule quand le libelle est vide', () => {
 
 /* ---------- preparation ---------- */
 
-test('preparer publie toutes les taches ouvertes, jamais les closes', async () => {
+test('preparer publie toutes les taches du portefeuille', async () => {
   const ctx = contexte([
-    projet('topi', 'TO', 'TOPI', [{titre: 'Refaire le site'}, {titre: 'finie', statut: 'fait'}]),
+    projet('topi', 'TO', 'TOPI', [{titre: 'Refaire le site'}]),
     projet('autre', 'AU', 'Autre', [{titre: 'Passer PSPO 2'}])
   ]);
   const faux = async () => '{"liste":[{"tache":"AU1","libelle":"PSPO 2"},' +
@@ -378,4 +378,71 @@ test('memoriserPublication borne le nombre de libelles gardes par tache', () => 
     sortante.memoriserPublication(ctx.dataDir, [{ref: 'RE1', libelle: 'libelle ' + i}]);
   }
   assert.strictEqual(sortante.aliasPublies(ctx.dataDir).get('RE1').length, 4);
+});
+
+/* ---------- declenchement par une ecriture ---------- */
+
+// Le contexte des tests n'autorise jamais la publication automatique : sans ce
+// garde-fou, chaque test d'ecriture enverrait un vrai message.
+test('planifierPublication ne fait rien sans autorisation explicite', () => {
+  assert.strictEqual(sortante.planifierPublication({dataDir: 'x'}), false);
+  assert.strictEqual(sortante.planifierPublication({dataDir: 'x', publierAuto: false}), false);
+  assert.strictEqual(sortante.planifierPublication(null), false);
+});
+
+// Une rafale d'ecritures (reordonnancement a la souris, correction lettre par
+// lettre) ne doit produire qu'une seule publication.
+test('planifierPublication regroupe une rafale d ecritures en un seul envoi', async () => {
+  const envois = [];
+  const ctx = ctxAvec(contexte([projet('topi', 'TO', 'TOPI',
+    [{titre: 'un'}, {titre: 'deux'}, {titre: 'trois'}])]), null, envois);
+  ctx.publierAuto = true;
+  ctx.lancerClaude = async () => '{"liste":[{"tache":"TO1","libelle":"un"},' +
+    '{"tache":"TO2","libelle":"deux"},{"tache":"TO3","libelle":"trois"}]}';
+
+  // Le vrai delai est de quinze secondes : on ne l'attend pas ici, on verifie
+  // que les appels successifs ne laissent qu'une seule echeance armee.
+  assert.strictEqual(sortante.planifierPublication(ctx), true);
+  assert.strictEqual(sortante.planifierPublication(ctx), true);
+  assert.strictEqual(sortante.planifierPublication(ctx), true);
+  await new Promise((r) => setTimeout(r, 30));
+  assert.strictEqual(envois.length, 0, 'rien ne part avant l echeance');
+});
+
+// Chemin complet : une ecriture passee par l'API programme la publication, et
+// celle-ci part reellement. C'est le cablage qui manquait quand la liste
+// n'etait republiee que par la tache horaire, jusqu'a cinquante neuf minutes
+// apres une suppression.
+test('une ecriture appliquee declenche la republication', async () => {
+  const api = require('../server/api.js');
+  const envois = [];
+  const ctx = contexte([projet('topi', 'TO', 'TOPI',
+    [{titre: 'un'}, {titre: 'deux'}, {titre: 'trois'}])]);
+  ctx.publierAuto = true;
+  ctx.delaiPublicationMs = 10;
+  ctx.lireMessages = async () => [];
+  ctx.envoyer = async (chatID, texte) => { envois.push({chatID, texte}); return {ok: true}; };
+  ctx.lancerClaude = async () => '{"liste":[{"tache":"TO1","libelle":"un"},' +
+    '{"tache":"TO2","libelle":"deux"},{"tache":"TO3","libelle":"trois"}]}';
+
+  const r = await api.handle({method: 'DELETE', url: '/api/tache'}, {ref: 'TO2'}, ctx);
+  assert.strictEqual(r.status, 200);
+  await new Promise((res) => setTimeout(res, 120));
+  assert.strictEqual(envois.length, 1, 'la suppression doit republier la liste');
+  assert.strictEqual(envois[0].chatID, CHAT);
+});
+
+test('une ecriture refusee ne declenche aucune republication', async () => {
+  const api = require('../server/api.js');
+  const envois = [];
+  const ctx = contexte([projet('topi', 'TO', 'TOPI',
+    [{titre: 'un'}, {titre: 'deux'}, {titre: 'trois'}])]);
+  ctx.publierAuto = true;
+  ctx.delaiPublicationMs = 10;
+  ctx.lireMessages = async () => [];
+  ctx.envoyer = async (chatID, texte) => { envois.push({chatID, texte}); return {ok: true}; };
+
+  await api.handle({method: 'DELETE', url: '/api/tache'}, {ref: 'ZZ9'}, ctx);
+  await new Promise((res) => setTimeout(res, 120));
+  assert.strictEqual(envois.length, 0);
 });

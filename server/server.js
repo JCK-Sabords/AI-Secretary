@@ -8,7 +8,11 @@ const RACINE = path.join(__dirname, '..');
 const CTX = {
   root: RACINE,
   dataDir: path.join(RACINE, 'data'),
-  projectsDir: path.join(RACINE, 'data', 'projects')
+  projectsDir: path.join(RACINE, 'data', 'projects'),
+  // Autorise la republication automatique de la liste dans la conversation a
+  // soi-meme apres chaque ecriture. Drapeau explicite et porte par ce seul
+  // contexte : les tests construisent le leur et n'envoient donc jamais rien.
+  publierAuto: true
 };
 
 // Amorce une installation neuve (tache 16 : rendre le depot installable par

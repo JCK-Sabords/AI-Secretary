@@ -22,7 +22,7 @@ function projetAvecDelegue(over) {
     id: 'estimmo', prefixe: 'ES', titre: 'Estimmo', domaine: 'side', statut: 'actif',
     echeance: '', prochaine_action: 'faire', jira: '', dernier_n: 1, contexte: '',
     taches: [Object.assign({
-      n: 2, titre: 'Relire la note de valeur', statut: 'bloque',
+      n: 2, titre: 'Relire la note de valeur',
       responsable: 'bruno', echeance: '2026-09-09', nature_echeance: 'dure',
       prio: 'P1', effort: 'S', bloque_par: '', derniere_relance: '',
       prochaine_relance: AUJ, maj_le: '2026-08-24', note_blocage: ''
@@ -50,8 +50,7 @@ test('relances retient une tache deleguee dont la date est atteinte', () => {
   assert.match(r[0].texte, /Relire la note de valeur/);
 });
 
-test('relances ignore une tache faite, une date future, et moi-meme', () => {
-  assert.strictEqual(people.relances(projetAvecDelegue({statut: 'fait'}), annuaire(), AUJ).length, 0);
+test('relances ignore une date future et une tache dont je suis responsable', () => {
   assert.strictEqual(people.relances(projetAvecDelegue({prochaine_relance: '2026-09-20'}), annuaire(), AUJ).length, 0);
   assert.strictEqual(people.relances(projetAvecDelegue({responsable: 'moi'}), annuaire(), AUJ).length, 0);
 });
@@ -168,11 +167,6 @@ test('relancesBloquees ignore une tache dont la date de relance n est pas attein
   assert.strictEqual(people.relances(projets, annuaire(), AUJ).length, 0);
 });
 
-test('relancesBloquees ignore une tache au statut fait', () => {
-  const projets = projetAvecDelegue({responsable: 'inconnu', statut: 'fait'});
-  assert.strictEqual(people.relancesBloquees(projets, annuaire(), AUJ).length, 0);
-});
-
 test('relancesBloquees ignore une tache dont le responsable est moi', () => {
   const projets = projetAvecDelegue({responsable: 'moi'});
   assert.strictEqual(people.relancesBloquees(projets, annuaire(), AUJ).length, 0);
@@ -188,27 +182,27 @@ test('relances et relancesBloquees sont exactement complementaires sur un portef
     echeance: '', prochaine_action: 'faire', jira: '', dernier_n: 6, contexte: '',
     taches: [
       // due, resolue : rejoint relances
-      {n: 1, titre: 'a', statut: 'bloque', responsable: 'bruno', echeance: '',
+      {n: 1, titre: 'a', responsable: 'bruno', echeance: '',
         nature_echeance: 'souhaitee', prio: 'P2', effort: 'M', bloque_par: '',
         derniere_relance: '', prochaine_relance: AUJ, maj_le: '2026-08-01', note_blocage: ''},
       // due, contact inconnu : rejoint bloquees
-      {n: 2, titre: 'b', statut: 'bloque', responsable: 'inconnu', echeance: '',
+      {n: 2, titre: 'b', responsable: 'inconnu', echeance: '',
         nature_echeance: 'souhaitee', prio: 'P2', effort: 'M', bloque_par: '',
         derniere_relance: '', prochaine_relance: AUJ, maj_le: '2026-08-01', note_blocage: ''},
       // due, conversation non resolue : rejoint bloquees
-      {n: 3, titre: 'c', statut: 'bloque', responsable: 'sans-chat', echeance: '',
+      {n: 3, titre: 'c', responsable: 'sans-chat', echeance: '',
         nature_echeance: 'souhaitee', prio: 'P2', effort: 'M', bloque_par: '',
         derniere_relance: '', prochaine_relance: AUJ, maj_le: '2026-08-01', note_blocage: ''},
       // pas encore due : ni l'une ni l'autre
-      {n: 4, titre: 'd', statut: 'bloque', responsable: 'inconnu', echeance: '',
+      {n: 4, titre: 'd', responsable: 'inconnu', echeance: '',
         nature_echeance: 'souhaitee', prio: 'P2', effort: 'M', bloque_par: '',
         derniere_relance: '', prochaine_relance: '2026-09-20', maj_le: '2026-08-01', note_blocage: ''},
-      // fait : ni l'une ni l'autre
-      {n: 5, titre: 'e', statut: 'fait', responsable: 'inconnu', echeance: '',
+      // responsable inconnu du repertoire : bloquee, comme ES2 et ES4
+      {n: 5, titre: 'e', responsable: 'inconnu', echeance: '',
         nature_echeance: 'souhaitee', prio: 'P2', effort: 'M', bloque_par: '',
         derniere_relance: '', prochaine_relance: AUJ, maj_le: '2026-08-01', note_blocage: ''},
       // moi : ni l'une ni l'autre
-      {n: 6, titre: 'f', statut: 'bloque', responsable: 'moi', echeance: '',
+      {n: 6, titre: 'f', responsable: 'moi', echeance: '',
         nature_echeance: 'souhaitee', prio: 'P2', effort: 'M', bloque_par: '',
         derniere_relance: '', prochaine_relance: AUJ, maj_le: '2026-08-01', note_blocage: ''}
     ]
@@ -219,13 +213,12 @@ test('relances et relancesBloquees sont exactement complementaires sur un portef
   const refsBloquees = bloquees.map((b) => b.ref).sort();
   // aucune tache dans les deux listes
   assert.deepStrictEqual(refsRelances.filter((r) => refsBloquees.includes(r)), []);
-  const tachesOuvertesDeleguesDues = projets[0].taches.filter((t) =>
-    t.statut !== 'fait' && t.statut !== 'abandonne' && t.responsable !== 'moi' &&
-    t.prochaine_relance && t.prochaine_relance <= AUJ).length;
-  assert.strictEqual(relancesDues.length + bloquees.length, tachesOuvertesDeleguesDues);
+  const tachesDelegueesDues = projets[0].taches.filter((t) =>
+    t.responsable !== 'moi' && t.prochaine_relance && t.prochaine_relance <= AUJ).length;
+  assert.strictEqual(relancesDues.length + bloquees.length, tachesDelegueesDues);
   assert.strictEqual(relancesDues.length, 1);
-  assert.strictEqual(bloquees.length, 2);
-  assert.deepStrictEqual(refsBloquees, ['ES2', 'ES3']);
+  assert.strictEqual(bloquees.length, 3);
+  assert.deepStrictEqual(refsBloquees, ['ES2', 'ES3', 'ES5']);
 });
 
 test('loadPeopleSafe garde la premiere occurrence en cas de doublon d id et le signale', () => {

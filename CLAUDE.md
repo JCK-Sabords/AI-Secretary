@@ -28,7 +28,6 @@ dernier_n: 1
 taches:
   - n: 1
     titre: Recaler le parsing des mutations DVF
-    statut: en_cours
     responsable: moi
     echeance: 2026-09-12
     nature_echeance: dure
@@ -63,11 +62,16 @@ Extension Chrome d'estimation immobiliere, repo exemple/estimmo.
 
 ### Champs de tache
 
+Une tache n'a **pas** de statut. Cet outil ne contient que du travail a faire : une tache
+terminee en sort, elle n'y reste pas marquee « fait ». La seule facon de clore une tache est de
+la supprimer (`delete_task`, le bouton croix du dashboard, ou la disparition de sa ligne dans la
+liste WhatsApp). Ne jamais reintroduire de champ `statut` sur une tache.
+
+
 | Champ | Role |
 |---|---|
 | `n` | numero, voir « non-reattribution des numeros » |
 | `titre` | intitule libre |
-| `statut` | `a_faire`, `en_cours`, `bloque`, `fait` ou `abandonne` |
 | `responsable` | `moi`, ou un `id` de `data/people.md` |
 | `echeance` | `AAAA-MM-JJ`, ou chaine vide |
 | `nature_echeance` | `dure` (engagement) ou `souhaitee` (intention) |
@@ -77,7 +81,7 @@ Extension Chrome d'estimation immobiliere, repo exemple/estimmo.
 | `derniere_relance` | `AAAA-MM-JJ` de la derniere relance envoyee, ou vide |
 | `prochaine_relance` | `AAAA-MM-JJ` a partir de laquelle une relance est due, ou vide |
 | `maj_le` | `AAAA-MM-JJ` de la derniere modification de la tache |
-| `note_blocage` | raison du blocage si `statut: bloque`, sinon vide |
+| `note_blocage` | ce qui empeche d'avancer, vide sinon |
 
 Toute valeur hors de ces listes fermees est refusee par le serveur (`server/store.js`,
 `DOMAINES` et `DOMAINES_PROJET`). Un champ date vide s'ecrit `''`, jamais autre chose : le

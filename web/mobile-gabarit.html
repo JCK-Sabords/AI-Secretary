@@ -209,7 +209,8 @@ function rendreProjets(items) {
     const sev = p.severite || 'idle';
     const taches = (p.taches || []).map((t) => (
       '<div class="proj-tache"><div class="titre">' + echapper(t.titre) + '</div>' +
-      '<div class="meta">' + echapper(t.statut) + (t.echeance ? ' · ' + echapper(t.echeance) : '') + '</div></div>'
+      '<div class="meta">' + echapper(t.prio || '') +
+        (t.echeance ? ' · ' + echapper(t.echeance) : '') + '</div></div>'
     )).join('') || '<div class="vide">Aucune tâche ouverte.</div>';
     return (
       '<details class="projet"><summary>' +

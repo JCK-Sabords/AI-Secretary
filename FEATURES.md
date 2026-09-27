@@ -717,3 +717,44 @@ Au passage, les trois attentes des scripts `.cmd` n'utilisent plus `timeout.exe`
 s'executer des que l'entree standard est redirigee, c'est-a-dire des que le script est lance
 autrement que par un double-clic. Elles passent par `Start-Sleep`, dans le meme appel
 PowerShell que l'action qui les precede quand il y en a un.
+
+## Iteration 31 : republication immediate, et retrait du statut des taches
+
+### La liste WhatsApp suit l'ecriture, plus l'horloge
+
+La publication n'etait declenchee que par la tache horaire. Une tache supprimee a 13h31
+n'atteignait le telephone qu'a 14h30 : la liste y etait fausse pendant une heure, sans que rien
+ne l'indique. Toute ecriture appliquee programme desormais la republication, qui ne part
+toujours que si la liste a reellement change.
+
+Un court delai separe la derniere ecriture de la publication. Il n'est pas la pour temporiser
+mais pour regrouper : reordonner cinq taches a la souris, ou corriger un intitule lettre par
+lettre, produit une rafale d'ecritures, et chacune declencherait sinon son propre classement par
+Claude et son propre message. Chaque nouvelle ecriture repousse l'echeance. La tache horaire
+reste en place comme filet.
+
+La republication automatique est conditionnee a un drapeau porte par le contexte du serveur :
+les tests construisent le leur et n'envoient donc jamais rien.
+
+### Une tache n'a plus de statut
+
+Cet outil ne contient que du travail a faire. Un statut n'y avait donc que des valeurs sans
+objet (`fait`, `abandonne` ne devraient jamais y rester) ou redondantes avec la priorite. Le
+champ est retire partout : modele, validation, dictee, export mobile, page mobile, et la colonne
+du tableau de bord.
+
+Consequences traitees dans la meme iteration :
+
+- `openTasks` ne filtre plus rien mais reste, et reste utilisee partout : elle nomme l'intention
+  au lieu de la supposer, et c'est elle qu'il faudra changer si un etat autre que « presente »
+  revenait un jour ;
+- le signal « WIP eleve », qui comptait les taches `en_cours`, disparait ;
+- `note_blocage` perd son effacement automatique, qui etait declenche par un changement de
+  statut. Le champ reste, il decrit ce qui empeche d'avancer ;
+- le prompt de dictee precise qu'une tache n'a pas de statut et que `delete_task` est la seule
+  facon de la clore, pour que le modele ne cherche pas a en changer un qui n'existe plus ;
+- les dix fichiers de projet ont ete reecrits pour en retirer le champ. Le diff ne contient que
+  des suppressions de lignes `statut`, dix-sept au total, aucun ajout.
+
+Un fichier ecrit avant ce retrait reste lisible : le champ est ignore au chargement et n'est
+jamais recopie a l'ecriture.

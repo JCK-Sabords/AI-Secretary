@@ -14,7 +14,7 @@ function contexte() {
   repo.saveProject(projectsDir, {id: 'demo', prefixe: 'DE', titre: 'Demo',
     domaine: 'side', statut: 'actif', echeance: '2026-09-10',
     prochaine_action: '', jira: '', dernier_n: 1, contexte: '',
-    taches: [{n: 1, titre: 'a', statut: 'en_cours', responsable: 'moi', echeance: '',
+    taches: [{n: 1, titre: 'a', responsable: 'moi', echeance: '',
       nature_echeance: 'souhaitee', prio: 'P3', effort: 'M', bloque_par: '',
       derniere_relance: '', prochaine_relance: '', maj_le: '2026-09-01',
       note_blocage: ''}]});
@@ -128,8 +128,7 @@ test('GET /api/etat gagne les cles people et relances', async () => {
     accountID: 'whatsapp', reseau: 'WhatsApp', participantID: '33600000000',
     chatId: 'chat-1', resolu_le: '2026-09-01'}]);
   await api.handle({method: 'POST', url: '/api/tache'},
-    {projet: 'demo', champs: {titre: 'a relancer', statut: 'bloque',
-      responsable: 'bruno', prochaine_relance: '2026-09-06'}}, ctx);
+    {projet: 'demo', champs: {titre: 'a relancer',       responsable: 'bruno', prochaine_relance: '2026-09-06'}}, ctx);
 
   const r = await api.handle({method: 'GET', url: '/api/etat'}, null, ctx);
   assert.strictEqual(r.status, 200);
@@ -144,8 +143,7 @@ test('GET /api/etat gagne la cle relancesBloquees et reflete l etat du repertoir
   // Aucune fiche pour ce responsable : la tache doit apparaitre bloquee, avec la
   // raison contact_inconnu, et non dans relances.
   await api.handle({method: 'POST', url: '/api/tache'},
-    {projet: 'demo', champs: {titre: 'a relancer', statut: 'bloque',
-      responsable: 'bruno', prochaine_relance: '2026-09-06'}}, ctx);
+    {projet: 'demo', champs: {titre: 'a relancer',       responsable: 'bruno', prochaine_relance: '2026-09-06'}}, ctx);
 
   let r = await api.handle({method: 'GET', url: '/api/etat'}, null, ctx);
   assert.strictEqual(r.status, 200);
@@ -174,8 +172,7 @@ function ctxAvecDelegue() {
   repo.saveProject(ctx.projectsDir, {id: 'estimmo', prefixe: 'ES', titre: 'Estimmo',
     domaine: 'side', statut: 'actif', echeance: '', prochaine_action: 'faire',
     jira: '', dernier_n: 1, contexte: '',
-    taches: [{n: 1, titre: 'relancer le notaire', statut: 'bloque',
-      responsable: 'bruno', echeance: '', nature_echeance: 'souhaitee',
+    taches: [{n: 1, titre: 'relancer le notaire',       responsable: 'bruno', echeance: '', nature_echeance: 'souhaitee',
       prio: 'P2', effort: 'M', bloque_par: '', derniere_relance: '',
       prochaine_relance: '2026-09-01', maj_le: '2026-08-01', note_blocage: ''}]});
   people.savePeople(ctx.dataDir, [{id: 'bruno', nom: 'Bruno Martin',

@@ -309,6 +309,53 @@ async function publier(ctx, options) {
   return {envoye: true, lignes: prep.lignes, texte};
 }
 
+// Publication declenchee par une ecriture, et non plus seulement par la tache
+// horaire. Une tache supprimee, renommee ou repriorisee doit se refleter tout de
+// suite dans la conversation : attendre le prochain passage, jusqu a cinquante
+// neuf minutes plus tard, rendait la liste du telephone fausse sans que rien ne
+// l indique.
+//
+// Un court delai separe la derniere ecriture de la publication. Il n est pas la
+// pour temporiser mais pour regrouper : reordonner cinq taches a la souris, ou
+// corriger un intitule lettre par lettre, produit une rafale d ecritures, et
+// chacune declencherait sinon son propre classement par Claude et son propre
+// message. Chaque nouvelle ecriture repousse l echeance, la publication n a donc
+// lieu qu une fois le remaniement termine.
+const DELAI_PUBLICATION_MS = 15000;
+let minuteurPublication = null;
+
+// Renvoie true si une publication a ete programmee. Elle ne l est que si le
+// contexte l autorise explicitement : les tests construisent leur propre
+// contexte et ne doivent jamais declencher d envoi reel.
+function planifierPublication(ctx, options) {
+  if (!ctx || ctx.publierAuto !== true) return false;
+  // Delai reglable par le contexte, pour que les tests verifient le chemin
+  // complet (ecriture, programmation, envoi) sans attendre quinze secondes.
+  const delai = typeof ctx.delaiPublicationMs === 'number'
+    ? ctx.delaiPublicationMs : DELAI_PUBLICATION_MS;
+  if (minuteurPublication) clearTimeout(minuteurPublication);
+  minuteurPublication = setTimeout(() => {
+    minuteurPublication = null;
+    publier(ctx, options).then((r) => {
+      if (r.envoye) {
+        console.log('liste WhatsApp publiee, ' + r.lignes.length + ' taches');
+      } else if (r.raison !== 'inchange') {
+        console.log('liste WhatsApp non publiee : ' + r.raison);
+      }
+    }).catch((e) => {
+      // Une publication en echec ne doit jamais faire tomber le serveur : la
+      // tache horaire repassera, et l ecriture qui l a declenchee est deja sur
+      // le disque.
+      console.log('liste WhatsApp en echec : ' + e.message);
+    });
+  }, delai);
+  // Sans unref, ce minuteur maintiendrait le processus en vie quinze secondes
+  // apres une demande d arret.
+  if (minuteurPublication.unref) minuteurPublication.unref();
+  return true;
+}
+
 module.exports = {construirePrompt, interpreter, raccourcir, rendreMessage,
+  planifierPublication, DELAI_PUBLICATION_MS,
   preparer, publier, refsDeLaDerniereListe, empreinte, extraireJson,
   aliasPublies, avecAlias, memoriserPublication, MOTS_MAX, FICHIER};
