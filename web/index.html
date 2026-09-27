@@ -1243,7 +1243,9 @@ function openDrawer(ref){
         '<div class="f"><span class="k">Objet du suivi</span>' +
           '<div class="about">« ' + esc(r.tacheTitre) + ' » · ' + esc(r.projetTitre) + '</div></div>' +
         '<div class="f"><label class="k" for="msg">Message rédigé par l\'agent</label>' +
-          '<textarea id="msg">' + esc(r.texte) + '</textarea></div>' +
+          '<textarea id="msg">' + esc(r.texte) + '</textarea>' +
+          '<span class="hint" id="msgEtat">Claude relit vos derniers échanges pour ' +
+          'en reprendre le ton...</span></div>' +
         '<div class="route">Rien n\'est encore parti. Le message ne s\'envoie qu\'au clic ci-dessous, ' +
           "et la reponse confirme la prise en compte par Beeper, pas la remise au destinataire.</div>" +
       '</div><footer>' +
@@ -1251,7 +1253,54 @@ function openDrawer(ref){
         '<button class="btn primary" type="button" data-send="' + esc(r.ref) + '">Envoyer via Beeper</button>' +
       '</footer></aside>';
   drawerHost.querySelector('textarea').focus();
+  redigerBrouillon(ref);
 }
+
+// Le tiroir s'ouvre tout de suite avec le texte de repli, puis Claude le
+// remplace quand il a lu le fil. Lire une conversation et interroger un modele
+// prend une trentaine de secondes : faire attendre le tiroir laisserait croire a
+// un blocage, et un brouillon generique vaut mieux qu'un ecran vide.
+//
+// Le texte n'est jamais remplace si l'utilisateur a commence a ecrire : sa
+// version l'emporte toujours sur celle du modele.
+async function redigerBrouillon(ref){
+  var champ = document.getElementById('msg');
+  if (!champ) return;
+  var initial = champ.value;
+  var data;
+  try {
+    var rep = await fetch('/api/relance/brouillon', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ref: ref})
+    });
+    data = await rep.json();
+  } catch (e) {
+    data = null;
+  }
+  var etatEl = document.getElementById('msgEtat');
+  var champApres = document.getElementById('msg');
+  // Le tiroir a pu etre ferme ou rouvert sur une autre relance pendant l'appel.
+  if (!champApres || champApres !== champ) return;
+
+  if (!data || !data.texte) {
+    if (etatEl) {
+      etatEl.textContent = 'Claude n\'a pas pu rédiger ce message : texte générique, à relire de près.';
+    }
+    return;
+  }
+  if (champ.value !== initial) {
+    if (etatEl) etatEl.textContent = 'Ta version est conservée, la proposition de Claude est ignorée.';
+    return;
+  }
+  champ.value = data.texte;
+  if (etatEl) {
+    etatEl.textContent = data.messagesLus
+      ? 'Rédigé par Claude d\'après vos ' + data.messagesLus + ' derniers messages.'
+      : 'Rédigé par Claude. Aucun échange précédent à relire pour le ton.';
+  }
+}
+
 function closeDrawer(){
   drawerHost.innerHTML = '';
   resolveRef = null;

@@ -900,3 +900,51 @@ Le brouillon destine a un agent immobilier disait « Salut M. », « d'ici le 20
 
 Reste ouvert, parce que c'est une decision de ton et non un defaut : le brouillon tutoie tout
 le monde. Cela convient a un frere, moins a un agent immobilier.
+
+## Iteration 36 : le brouillon de relance est redige a partir du fil reel
+
+Le gabarit ecrivait toujours la meme chose, tutoyait tout le monde, et reclamait un point
+d'avancement sans jamais dire pourquoi l'interlocuteur y aurait interet. Adresse a un agent
+immobilier avec qui le proprietaire se vouvoie, il etait a cote de la plaque, et c'est lui qui
+en portait la signature.
+
+Le brouillon est desormais redige par Claude a partir des **dix derniers messages** echanges
+avec la personne. Trois exigences lui sont posees, dans cet ordre.
+
+**Reprendre le registre du fil.** Vouvoiement ou tutoiement, formule d'ouverture, formule de
+politesse, longueur des phrases : cela se lit dans la conversation, cela ne se decide pas dans
+le code. Sans fil, on vouvoie.
+
+**Jamais de ton condescendant.** L'interdiction est concrete plutot qu'abstraite, parce que
+l'abstraction ne suffisait pas : « toujours sans nouvelles », « sans retour de votre part »,
+« je me permets de vous relancer », « pour rappel », « dans l'attente », toute mention d'un
+delai ecoule sont nommement bannies. Une relance ne doit jamais faire sentir qu'elle en est
+une.
+
+**Montrer a la personne son propre interet a avancer**, au sens de Dale Carnegie : ce que cela
+lui evite, lui fait gagner, ou lui permet de boucler de son cote, formule de son point de vue a
+elle. C'est le coeur du message, pas une politesse ajoutee a la fin.
+
+S'y ajoutent deux regles de justesse : ne mentionner que des faits presents dans le fil, et
+partir de la prochaine etape deja convenue plutot que de reposer la question depuis le debut.
+
+### Le fil lu n'est pas toujours celui de la fiche
+
+Defaut trouve sur le cas reel. La fiche du repertoire porte la conversation d'envoi, qui peut
+etre toute neuve et vide quand le contact vient d'etre resolu, alors que l'echange se tient
+ailleurs : ici un SMS et non un WhatsApp. `filHistorique` cherche donc, parmi les conversations
+qui portent **exactement** le nom de la fiche, celle qui a le plus de messages. Une
+correspondance approximative ferait lire la conversation de quelqu'un d'autre pour en imiter le
+ton, ce qui serait bien pire que de n'en lire aucune.
+
+Cette recherche ne sert qu'a **lire**. L'envoi reste sur la conversation figee dans la fiche :
+deviner un destinataire serait une tout autre affaire, et une faute.
+
+### Garanties
+
+Le fil est traite comme une donnee, jamais comme une consigne : un message qui ressemblerait a
+une instruction reste un propos rapporte. `server/brouillon.js` ne connait aucune voie d'envoi,
+ce qu'un test verifie sur son code source. Le tiroir s'ouvre immediatement avec le texte de
+repli, affiche « Claude relit vos derniers echanges pour en reprendre le ton », puis remplace
+le brouillon a l'arrivee, sauf si l'utilisateur a deja commence a ecrire : sa version l'emporte
+toujours.

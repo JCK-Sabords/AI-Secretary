@@ -11,6 +11,11 @@ const lancement = require('./lancement');
 const devinerProjet = require('./deviner-projet');
 const semaine = require('./semaine');
 const listeSortante = require('./liste-sortante');
+const brouillon = require('./brouillon');
+// Nomme configuration et non config : envoyerRecap declare plus bas une
+// variable locale config, et deux noms identiques a deux portees differentes
+// rendraient la lecture du fichier trompeuse.
+const configuration = require('./config');
 
 // Fige l'instant ou ce module a ete charge, donc le demarrage du processus.
 const DEMARRE_LE = new Date().toISOString();
@@ -313,6 +318,30 @@ async function handle(req, body, ctx) {
     } catch (e) {
       return reponseErreurBeeper(e);
     }
+  }
+
+  // Brouillon de relance redige par Claude a partir du fil reel. Route separee
+  // de /api/etat parce qu'elle lit une conversation et appelle un modele : le
+  // tableau de bord s'affiche avec le texte de repli et remplace le brouillon a
+  // l'arrivee. Elle n'envoie jamais rien.
+  if (req.method === 'POST' && url === '/api/relance/brouillon') {
+    if (!body || typeof body.ref !== 'string' || body.ref.trim() === '') {
+      return {status: 400, json: {erreur: 'corps attendu : {ref: "..."}'}};
+    }
+    const {projects} = repo.loadAllSafe(ctx.projectsDir);
+    const hit = store.findByRef(projects, body.ref);
+    if (!hit) return {status: 404, json: {erreur: 'reference inconnue'}};
+    const {people: gens} = people.loadPeopleSafe(ctx.dataDir);
+    const personne = gens.filter((g) => g.id === hit.task.responsable)[0];
+    if (!personne) return {status: 404, json: {erreur: 'responsable absent du repertoire'}};
+    const r = await brouillon.rediger(personne, hit.project, hit.task, {
+      proprietaire: configuration.lireConfig(ctx.dataDir).proprietaire,
+      today: ctx.today || aujourdhui(),
+      lancerClaude: ctx && ctx.lancerClaude,
+      lireMessages: ctx && ctx.lireMessages,
+      chercherChats: ctx && ctx.chercherChats
+    });
+    return {status: 200, json: r};
   }
 
   if (req.method === 'POST' && url === '/api/relance') {

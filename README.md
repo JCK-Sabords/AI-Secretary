@@ -321,6 +321,15 @@ Toutes ecrivent dans les memes fichiers de `data/projects/` et `data/people.md`.
    maintenant » permet de ne pas l'attendre. Sans cette troisieme liste, une tache deleguee
    correctement preparee n'apparaissait nulle part jusqu'au jour dit.
 
+   Le brouillon de relance est redige par Claude a partir des dix derniers messages echanges
+   avec la personne (`POST /api/relance/brouillon`, `server/brouillon.js`), pour en reprendre
+   le registre. Il lui est demande de ne jamais prendre un ton condescendant, une liste de
+   formules etant nommement interdite, et de montrer a l'interlocuteur son propre interet a
+   avancer. Le fil lu peut etre une autre conversation que celle de la fiche, quand celle-ci
+   est vide et que l'echange se tient ailleurs ; la correspondance de nom est alors exacte, et
+   cette recherche ne sert qu'a lire, jamais a choisir un destinataire. Le tiroir affiche
+   d'abord un texte de repli, puis le remplace, sauf si tu as commence a ecrire.
+
    Une tache deleguee (`responsable` different de `moi`) porte deux champs de relance,
    « Derniere relance » et « Prochaine relance », visibles uniquement pour ce cas (masques des
    la selection de `moi`, sans recharger le formulaire) ; un bouton « Dans une semaine » pose

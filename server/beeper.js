@@ -104,6 +104,19 @@ async function chercherContacts(accountID, query, opts) {
   return Array.from(parNoyau.values());
 }
 
+// Conversations dont le titre correspond au texte cherche. Sert uniquement a
+// retrouver le fil ou l'on a reellement echange avec quelqu'un : la fiche du
+// repertoire porte la conversation d'envoi, qui peut etre vide si elle vient
+// d'etre ouverte, alors que l'historique utile est ailleurs (un SMS plutot
+// qu'un WhatsApp, par exemple).
+async function chercherChats(query, opts) {
+  const data = await appel('/v1/chats/search?query=' + encodeURIComponent(query),
+    {method: 'GET'}, opts);
+  return (Array.isArray(data.items) ? data.items : []).map((c) => ({
+    id: c.id, titre: c.title || '', accountID: c.accountID || ''
+  }));
+}
+
 async function ouvrirChat(accountID, participantID, opts) {
   const data = await appel('/v1/chats', {method: 'POST', body: JSON.stringify({
     accountID, type: 'single', participantIDs: [participantID]
@@ -139,5 +152,6 @@ async function messages(chatID, limite, opts) {
   })).sort((a, b) => (a.timestamp < b.timestamp ? 1 : a.timestamp > b.timestamp ? -1 : 0));
 }
 
-module.exports = {comptes, disponible, chercherContacts, noyauContact, ouvrirChat, envoyer,
+module.exports = {comptes, disponible, chercherContacts, noyauContact,
+  chercherChats, ouvrirChat, envoyer,
   messages, BASE};
