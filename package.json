@@ -8,7 +8,8 @@
     "start": "node server/server.js",
     "trouver-fil-notes": "node outils/trouver-fil-notes.js",
     "exporter-mobile": "node outils/exporter-mobile.js",
-    "publier-liste": "node outils/publier-liste.js"
+    "publier-liste": "node outils/publier-liste.js",
+    "icone": "node outils/generer-icone.js"
   },
   "dependencies": {
     "js-yaml": "^4.1.0"

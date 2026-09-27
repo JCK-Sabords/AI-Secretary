@@ -801,3 +801,27 @@ delai maximal d'execution ne s'appliquerait plus.
 
 Verifie en lancant les trois taches a la main : aucune fenetre, code de retour 0, et les
 journaux `liste-sortante.log` et `export.log` recoivent bien leur ligne.
+
+## Iteration 34 : une vraie icone pour le raccourci
+
+Le raccourci du Bureau portait l'icone generique des fichiers `.cmd`, parce que son
+`IconLocation` pointait sur `demarrer.cmd` lui-meme.
+
+`outils/generer-icone.js` produit desormais `web/secretariat.ico`, sans aucune dependance : le
+PNG et le conteneur ICO sont ecrits octet par octet et le dessin est purement geometrique. Le
+depot n'a qu'une seule dependance, `js-yaml`, et une icone n'avait pas a en ajouter une seconde.
+
+Le motif reprend le tableau de bord plutot que d'inventer un symbole : la barre verticale de
+gravite qui borde chaque ligne de projet, et trois lignes de liste de longueurs decroissantes,
+la plus haute a la couleur d'accent puisque c'est la prochaine action. Les couleurs sont celles
+de l'identite « Nuit », reprises telles quelles.
+
+L'icone porte sept tailles, de 16 a 256 pixels, chacune dessinee a sa taille plutot que reduite
+depuis la plus grande. Le rendu a 16 pixels a ete verifie sur une planche agrandie au plus
+proche voisin : c'est la seule facon de voir ce que Windows affichera vraiment dans la barre des
+taches. Les extremites de la barre et des lignes sont arrondies, des bouts carres durcissaient
+le motif des la taille 32.
+
+`installer-raccourci.ps1` applique l'icone, en retombant sur l'ancien comportement si le fichier
+manque. La meme icone sert de favicone au tableau de bord : l'onglet et le lanceur doivent se
+reconnaitre au premier coup d'oeil.

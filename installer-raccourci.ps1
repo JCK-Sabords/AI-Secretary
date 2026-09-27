@@ -34,7 +34,11 @@ $wsh = New-Object -ComObject WScript.Shell
 $lnk = $wsh.CreateShortcut($raccourci)
 $lnk.TargetPath = $cible
 $lnk.WorkingDirectory = $racineDepot
-$lnk.IconLocation = $cible
+# Sans icone propre, Windows affiche celle, generique, des fichiers .cmd.
+# Celle-ci est produite par npm run icone et versionnee : un poste qui
+# clone le depot la trouve deja prete.
+$icone = Join-Path $racineDepot 'web\secretariat.ico'
+if (Test-Path $icone) { $lnk.IconLocation = "$icone,0" } else { $lnk.IconLocation = $cible }
 $lnk.Description = 'Secretariat particulier : demarre le serveur local et ouvre le tableau de bord.'
 $lnk.Save()
 

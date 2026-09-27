@@ -119,6 +119,11 @@ mais demande des droits administrateur que rien d'autre dans cette installation 
 
 ## Le raccourci
 
+Son icone est `web/secretariat.ico`, produite par `npm run icone`
+(`outils/generer-icone.js`, sans dependance) et versionnee, pour qu'un poste qui clone le depot
+la trouve prete. `npm run icone -- --apercu` ecrit en plus un rendu 256 pixels pour juger le
+dessin a l'oeil. La meme icone sert de favicone au tableau de bord.
+
 Le lanceur reutilise un serveur qui repond deja, sauf si le code a change depuis son
 demarrage : il compare alors l'instant renvoye par `GET /api/version` a la date de
 modification des fichiers source, et redemarre le serveur. Node chargeant ses modules une
