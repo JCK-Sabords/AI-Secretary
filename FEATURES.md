@@ -948,3 +948,33 @@ ce qu'un test verifie sur son code source. Le tiroir s'ouvre immediatement avec 
 repli, affiche « Claude relit vos derniers echanges pour en reprendre le ton », puis remplace
 le brouillon a l'arrivee, sauf si l'utilisateur a deja commence a ecrire : sa version l'emporte
 toujours.
+
+## Iteration 37 : toute tache deleguee figure au panneau des relances
+
+Signale par l'utilisateur : GA1, confiee a quelqu'un d'autre, n'apparaissait nulle part.
+
+La regle exigeait une date de relance. Une tache deleguee sans date etait donc invisible : pas
+dans « Ma semaine », qui ne montre que ce qu'on fait soi-meme, pas dans les relances non plus.
+Elle sortait du champ de vision au moment precis ou l'on cessait d'en etre responsable. Quatre
+taches etaient dans ce cas.
+
+L'absence de date vaut desormais « a relancer des maintenant ». La meme regle s'applique aux
+relances bloquees : une tache deleguee a quelqu'un dont le contact n'est pas resolu le signale,
+avec ou sans date.
+
+L'invariant tenu par les tests est maintenant plus fort : **aucune tache confiee a quelqu'un
+d'autre ne peut tomber dans aucune des trois listes**. Elle est due, programmee, ou bloquee.
+
+### Le contact de M. Barec pointe sur le bon canal
+
+Sa fiche portait la conversation WhatsApp creee au moment de la resolution, vide, alors que
+l'echange se tient par SMS. Le brouillon lisait deja le bon fil, mais l'envoi serait parti sur
+un canal ou il n'a jamais ecrit. La fiche est repointee sur le fil SMS.
+
+### Le redemarrage du lanceur attend la liberation reelle du port
+
+Trouve en verifiant ce qui precede. `arreter` puis `demarrer` enchaines laissaient parfois le
+processus mourant tenir encore le fichier journal : `Start-Process` echouait alors sans un mot,
+et le lanceur repartait en attente comme si le serveur tardait a demarrer. L'arret attend
+desormais que le port soit reellement libere, au lieu d'une duree fixe, et le demarrage
+reessaie quelques secondes avant d'afficher un echec explicite.

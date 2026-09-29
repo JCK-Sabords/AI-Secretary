@@ -314,6 +314,11 @@ Toutes ecrivent dans les memes fichiers de `data/projects/` et `data/people.md`.
    elle, on ne pouvait deleguer qu'aux personnes deja presentes. La recherche ne montre chaque
    contact qu'une fois, Beeper renvoyant la meme personne sous deux formes d'identifiant.
 
+   **Toute tache dont le responsable n'est pas `moi` figure au panneau**, avec ou sans date de
+   relance : une absence de date vaut « a relancer des maintenant ». Sans cette regle, deleguer
+   une tache sans rien programmer la faisait disparaitre de la vue, ni dans « Ma semaine », qui
+   ne montre que ce qu'on fait soi-meme, ni dans les relances.
+
    Le panneau « Relances a valider » porte trois listes. Les **bloquees** d'abord, qui
    demandent de resoudre un contact, signalees des que le responsable est designe et sans
    attendre la date. Les **dues** ensuite, relisibles et envoyables. Les **programmees** enfin,

@@ -204,6 +204,67 @@ test('relancesAVenir ignore une tache sans date de relance', () => {
   assert.strictEqual(people.relancesAVenir(projets, annuaire(), AUJ).length, 0);
 });
 
+/* ---------- une tache deleguee figure toujours au panneau ---------- */
+
+// Deleguer une tache sans programmer de relance la faisait disparaitre de la
+// vue : ni dans « Ma semaine », qui ne montre que ce qu'on fait soi-meme, ni
+// dans les relances, qui exigeaient une date. Absence de date vaut desormais
+// « a relancer des maintenant ».
+test('relances retient une tache deleguee sans date de relance', () => {
+  const projets = projetAvecDelegue({prochaine_relance: ''});
+  const r = people.relances(projets, annuaire(), AUJ);
+  assert.strictEqual(r.length, 1);
+  assert.strictEqual(r[0].dansJours, 0, 'elle est due, pas programmee');
+});
+
+test('relancesAVenir ne retient pas une tache sans date, qui est due', () => {
+  const projets = projetAvecDelegue({prochaine_relance: ''});
+  assert.strictEqual(people.relancesAVenir(projets, annuaire(), AUJ).length, 0);
+});
+
+test('une tache deleguee sans date signale quand meme son contact casse', () => {
+  const projets = projetAvecDelegue({responsable: 'inconnu', prochaine_relance: ''});
+  const b = people.relancesBloquees(projets, annuaire(), AUJ);
+  assert.strictEqual(b.length, 1);
+  assert.strictEqual(b[0].raison, 'contact_inconnu');
+});
+
+// L'invariant qui compte desormais : aucune tache confiee a quelqu'un d'autre ne
+// doit tomber dans aucune des trois listes.
+test('toute tache deleguee figure dans exactement une des trois listes', () => {
+  const gens = annuaire().concat([
+    {id: 'sans-chat', nom: 'Sans Chat', accountID: 'whatsapp', reseau: 'WhatsApp',
+      participantID: '2', chatId: '', resolu_le: ''}
+  ]);
+  const tache = (n, extra) => Object.assign({
+    n, titre: 't' + n, responsable: 'bruno', echeance: '',
+    nature_echeance: 'souhaitee', prio: 'P2', effort: 'M', bloque_par: '',
+    derniere_relance: '', prochaine_relance: '', maj_le: '2026-08-01', note_blocage: ''
+  }, extra);
+  const projets = [{
+    id: 'estimmo', prefixe: 'ES', titre: 'Estimmo', domaine: 'side', statut: 'actif',
+    echeance: '', prochaine_action: '', jira: '', dernier_n: 6, contexte: '',
+    taches: [
+      tache(1),                                              // sans date, resolue
+      tache(2, {prochaine_relance: AUJ}),                    // due
+      tache(3, {prochaine_relance: '2026-12-01'}),           // programmee
+      tache(4, {responsable: 'inconnu'}),                    // contact inconnu
+      tache(5, {responsable: 'sans-chat'}),                  // conversation non resolue
+      tache(6, {responsable: 'moi'})                         // pas deleguee
+    ]
+  }];
+  const dans = []
+    .concat(people.relances(projets, gens, AUJ).map((r) => r.ref))
+    .concat(people.relancesAVenir(projets, gens, AUJ).map((r) => r.ref))
+    .concat(people.relancesBloquees(projets, gens, AUJ).map((r) => r.ref));
+
+  ['ES1', 'ES2', 'ES3', 'ES4', 'ES5'].forEach((ref) => {
+    assert.strictEqual(dans.filter((r) => r === ref).length, 1,
+      ref + ' doit figurer dans exactement une liste');
+  });
+  assert.ok(!dans.includes('ES6'), 'une tache dont je suis responsable n y figure jamais');
+});
+
 /* ---------- redaction du brouillon ---------- */
 
 // « M. BAREC agent Immo » donnait « Salut M. ».

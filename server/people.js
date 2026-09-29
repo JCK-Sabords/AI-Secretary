@@ -123,8 +123,14 @@ function relances(projects, gens, today, avenir) {
   projects.forEach((p) => {
     store.openTasks(p).forEach((t) => {
       if (t.responsable === 'moi') return;
-      if (!t.prochaine_relance) return;
-      const jours = store.daysBetween(t.prochaine_relance, today);
+      // Une tache confiee a quelqu'un d'autre figure toujours au panneau, meme
+      // sans date de relance. Sans cette regle, deleguer une tache et ne rien
+      // programmer la faisait disparaitre de la vue : elle n'etait ni dans « Ma
+      // semaine », qui ne montre que ce qu'on fait soi-meme, ni dans les
+      // relances. Absence de date vaut donc « a relancer des maintenant ».
+      const jours = t.prochaine_relance
+        ? store.daysBetween(t.prochaine_relance, today)
+        : 0;
       // `avenir` demande l'autre moitie : les relances correctement preparees
       // mais pas encore dues. Elles ne sont pas actionnables, elles servent a
       // distinguer « programmee » de « cassee ». Sans elles, une tache deleguee
@@ -171,8 +177,7 @@ function relancesBloquees(projects, gens, today) {
   projects.forEach((p) => {
     store.openTasks(p).forEach((t) => {
       if (t.responsable === 'moi') return;
-      if (!t.prochaine_relance) return;
-      // A la difference de relances, aucune borne de date ici : un contact non
+      // Ni date requise ni borne de date ici : un contact non
       // resolu doit se voir des qu'il est designe, pas le jour de l'echeance.
       // Attendre reviendrait a decouvrir le probleme au moment precis ou on
       // comptait envoyer, et c'est exactement le silence qui a ete signale.

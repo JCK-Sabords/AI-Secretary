@@ -65,7 +65,11 @@ goto ouvrir
 
 echo Demarrage du serveur local...
 if not exist "%~dp0data\history" mkdir "%~dp0data\history" >nul 2>&1
-powershell -NoProfile -Command "Start-Process -FilePath 'node' -ArgumentList 'server\server.js' -WorkingDirectory '%~dp0.' -WindowStyle Hidden -RedirectStandardOutput '%JOURNAL%' -RedirectStandardError '%JOURNAL%.err'"
+rem La redirection echoue tant que le journal est tenu par un processus qui
+rem vient d etre arrete : on reessaie quelques secondes plutot que d abandonner
+rem sans rien dire, et l echec finit par s afficher au lieu de se deguiser en
+rem serveur qui ne demarre pas.
+powershell -NoProfile -Command "$ok = $false; for ($i = 0; $i -lt 10 -and -not $ok; $i++) { try { Start-Process -FilePath 'node' -ArgumentList 'server\server.js' -WorkingDirectory '%~dp0.' -WindowStyle Hidden -RedirectStandardOutput '%JOURNAL%' -RedirectStandardError '%JOURNAL%.err' -ErrorAction Stop; $ok = $true } catch { Start-Sleep -Milliseconds 500 } }; if (-not $ok) { Write-Host 'Le serveur n a pas pu etre lance : journal inaccessible.' }"
 
 set /a tentatives=0
 :attendre
@@ -116,10 +120,15 @@ exit /b %errorlevel%
 rem Sous-routine : arrete le serveur qui ecoute sur le port, par le port et
 rem jamais par le nom du processus, comme arreter.cmd.
 :arreterServeur
-rem L attente se fait dans le meme appel PowerShell que l arret : timeout.exe
-rem refuse de s executer quand l entree standard est redirigee, ce qui arrive
-rem des que ce script est lance autrement que par un double-clic.
-powershell -NoProfile -Command "$c = Get-NetTCPConnection -LocalPort %PORT% -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1; if ($c) { Stop-Process -Id $c.OwningProcess -Force; Start-Sleep -Seconds 2 }"
+rem L arret attend que le port soit reellement libere, et non une duree fixe.
+rem Un delai arbitraire laissait parfois le processus mourant tenir encore le
+rem port et surtout le fichier journal : le demarrage suivant redirigeait sa
+rem sortie vers un fichier verrouille, Start-Process echouait sans un mot, et
+rem le lanceur repartait en attente comme si rien ne s etait passe.
+rem
+rem L attente se fait dans le meme appel PowerShell : timeout.exe refuse de
+rem s executer quand l entree standard est redirigee.
+powershell -NoProfile -Command "$c = Get-NetTCPConnection -LocalPort %PORT% -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1; if (-not $c) { exit 0 }; Stop-Process -Id $c.OwningProcess -Force; for ($i = 0; $i -lt 30; $i++) { Start-Sleep -Milliseconds 300; if (-not (Get-NetTCPConnection -LocalPort %PORT% -State Listen -ErrorAction SilentlyContinue)) { break } }"
 exit /b 0
 
 rem Sous-routine : interroge http://127.0.0.1:%PORT%/api/etat et distingue
