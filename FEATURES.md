@@ -978,3 +978,40 @@ processus mourant tenir encore le fichier journal : `Start-Process` echouait alo
 et le lanceur repartait en attente comme si le serveur tardait a demarrer. L'arret attend
 desormais que le port soit reellement libere, au lieu d'une duree fixe, et le demarrage
 reessaie quelques secondes avant d'afficher un echec explicite.
+
+## Iteration 38 : trois habillages au choix
+
+Apres comparaison de vingt maquettes, deux directions sont retenues a cote de l'habillage
+d'origine. Le tableau de bord bascule desormais entre les trois, par un selecteur dans le
+bandeau.
+
+- **Nuit**, l'habillage d'origine, inchange ;
+- **Nuit serif**, memes couleurs, titrage en romaine (Newsreader) et graisses allegees ;
+- **Jour**, le meme dessin sur fond ivoire.
+
+Rien n'a bouge dans la structure : ce sont les memes panneaux, la meme grille, les memes
+composants. Tout ce qui distingue un habillage tient en jetons CSS, et le theme s'applique
+par un seul attribut sur `<html>`. Aucun composant ne connait le nom de l'habillage courant.
+
+### Ce que l'exercice a demande
+
+**Une seule couleur etait encore ecrite en dur**, celle du voile des tiroirs. Elle est devenue
+un jeton. Un test verifie maintenant qu'aucune couleur ne subsiste hors des blocs d'habillage :
+c'est le genre d'oubli qui passe inapercu en nuit et donne, en jour, du texte sombre sur fond
+sombre a un endroit ou personne ne regarde.
+
+**Les teintes d'alerte sont assombries en jour, pas seulement inversees.** Un jaune et un rouge
+qui se lisent sur du charbon deviennent illisibles sur du papier. Les contrastes ont ete
+mesures dans le navigateur plutot que supposes : le plus faible est a 4,56 pour un seuil de
+4,5, et la plupart depassent 5.
+
+**L'habillage est pose avant le premier rendu**, par un petit script dans le `<head>`.
+Applique depuis le script principal, il serait arrive apres la premiere peinture et la page
+aurait clignote en nuit avant de passer en jour.
+
+**Un nom d'habillage inconnu retombe sur la nuit.** Un stockage bricole a la main ou herite
+d'une version anterieure ne doit jamais laisser la page sans jetons. Lecture comme ecriture du
+choix sont protegees : en navigation privee, l'habillage tient pour la session.
+
+Le harnais de `test/web.charger.test.js` a gagne un `documentElement` : son faux document n'en
+avait pas, et le script le lit desormais au chargement.

@@ -87,7 +87,12 @@ function elementFactice() {
 
 function documentFactice() {
   const elements = new Map();
+  // documentElement porte l'habillage (<html data-theme>) : le script le lit au
+  // chargement pour aligner le selecteur. Un faux document sans lui faisait
+  // lever avant meme que charger() ne soit appele.
+  const racine = elementFactice();
   return {
+    documentElement: racine,
     getElementById(id) {
       if (!elements.has(id)) elements.set(id, elementFactice());
       return elements.get(id);

@@ -2,16 +2,43 @@
      doivent se reconnaitre au premier coup d'oeil dans la barre des taches. -->
 <link rel="icon" href="/secretariat.ico" sizes="any">
 <title>Secrétariat particulier</title>
+<script data-theme-init>
+/* Pose l'habillage choisi avant le premier rendu. Applique depuis le script
+   principal, il arriverait apres la premiere peinture et le tableau de bord
+   clignoterait en nuit avant de passer en jour. */
+(function(){
+  var THEMES = ['nuit', 'nuit-serif', 'jour'];
+  var choisi = 'nuit';
+  try {
+    var garde = window.localStorage.getItem('secretariat-theme');
+    if (THEMES.indexOf(garde) !== -1) choisi = garde;
+  } catch (e) {
+    /* Navigation privee, stockage bloque : l'habillage par defaut suffit. */
+  }
+  document.documentElement.setAttribute('data-theme', choisi);
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Figtree:wght@400;500;600;800&family=Martian+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Figtree:wght@300;400;500;600;800&family=Martian+Mono:wght@400;600&family=Newsreader:opsz,wght@6..72,300;6..72,400;6..72,500&display=swap">
 <style>
 /* ============================================================
    Identité « Nuit ». Le poste de travail assume un monde visuel
    unique : chaque couleur est peinte explicitement, y compris le
    fond du body, pour tenir quel que soit le thème de l'hôte.
    ============================================================ */
-:root{
+/* ---------- les trois habillages ----------
+   Tout ce qui distingue un habillage d'un autre est ici, en jetons. Aucune
+   couleur et aucune police ne doit etre ecrite en dur ailleurs dans cette
+   feuille : sans cette regle, un habillage en oublierait une et le tableau de
+   bord afficherait du texte sombre sur fond sombre a un endroit ou a un autre.
+   Le theme s'applique sur <html data-theme>, pose avant le premier rendu par le
+   petit script du <head>.
+
+   `nuit` est l'habillage d'origine et sert de base : les deux autres ne
+   redefinissent que ce qu'ils changent, ce qui rend visible, en les lisant, ce
+   qui fait leur difference. */
+:root, [data-theme="nuit"]{
   color-scheme:dark;
   --paper:#14151A; --surface:#1B1D24; --surface-2:#22252E; --sunken:#101116;
   --ink:#ECEAE5; --ink-2:#A9A79F; --muted:#77746C;
@@ -20,10 +47,34 @@
   --on-accent:#14151A;
   --ok:#5FAE7C; --warn:#D9A038; --crit:#E2705C;
   --ok-soft:rgba(95,174,124,.14); --warn-soft:rgba(217,160,56,.14); --crit-soft:rgba(226,112,92,.14);
+  --scrim:rgba(8,8,10,.55);
   --display:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif; --display-wght:800; --display-tight:-.025em;
   --body:"Figtree","Helvetica Neue",Arial,sans-serif;
+  --titre:var(--body); --titre-wght:500;
   --mono:"Martian Mono",ui-monospace,Consolas,monospace;
   --sc-label:.09em;
+}
+
+/* Nuit serif : memes couleurs, autre voix. Le titrage passe a une romaine et
+   les graisses tombent, ce qui change surtout le rythme de lecture. */
+[data-theme="nuit-serif"]{
+  --display:"Newsreader",Georgia,serif; --display-wght:500; --display-tight:-.01em;
+  --titre:"Newsreader",Georgia,serif; --titre-wght:500;
+}
+
+/* Jour papier : le meme dessin sur un fond ivoire. Les teintes d'alerte sont
+   assombries, pas seulement inversees : un jaune ou un rouge qui se lisent sur
+   du charbon deviennent illisibles sur du papier. */
+[data-theme="jour"]{
+  color-scheme:light;
+  --paper:#F5F1E8; --surface:#FFFDF8; --surface-2:#F0EBDF; --sunken:#EDE6D6;
+  --ink:#1F1D1A; --ink-2:#5E574D; --muted:#6F685C;
+  --rule:#E3DCCC; --rule-soft:#EDE7D9;
+  --accent:#96630F; --accent-soft:rgba(150,99,15,.12);
+  --on-accent:#FFFDF8;
+  --ok:#3F6B3C; --warn:#8A6516; --crit:#B0442F;
+  --ok-soft:rgba(63,107,60,.12); --warn-soft:rgba(138,101,22,.12); --crit-soft:rgba(176,68,47,.12);
+  --scrim:rgba(31,29,26,.42);
 }
 
 *{box-sizing:border-box}
@@ -56,6 +107,13 @@ body{
    aucun rayon de bordure (identite visuelle sans coin arrondi, voir .toast .dot
    et .sevbar, deja carres). ---------- */
 .health{display:flex;gap:8px;align-items:center}
+/* Etiquette lue par un lecteur d'ecran, invisible a l'oeil : le selecteur ne
+   porte aucun texte visible, il lui faut tout de meme un nom. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.choix-theme{font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--ink-2);background:var(--surface);border:1px solid var(--rule);padding:4px 8px;cursor:pointer}
+.choix-theme:hover{color:var(--ink);border-color:var(--ink-2)}
 .voyant{display:inline-flex;align-items:center;gap:6px;cursor:pointer;
   background:var(--surface);color:var(--ink-2);border-color:var(--rule)}
 .voyant:hover{background:var(--surface-2)}
@@ -243,7 +301,7 @@ td.date.none{color:var(--muted)}
 .addtask-btn:hover{background:var(--surface-2);color:var(--ink)}
 .prow.dragover{outline:2px dashed var(--accent);outline-offset:-2px}
 .ref{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--ink-2)}
-.ttl{font-size:15px;color:var(--ink);font-weight:500}
+.ttl{font-family:var(--titre);font-size:15px;color:var(--ink);font-weight:var(--titre-wght)}
 .pill{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 7px;
   border:1px solid currentColor;display:inline-block;white-space:nowrap}
 .pill.encours{color:var(--accent);background:var(--accent-soft)}
@@ -293,7 +351,7 @@ input[type="date"]{font-family:var(--mono);font-size:12px}
 .inline-btn input{flex:1;min-width:0}
 
 /* ---------- tiroir relance ---------- */
-.scrim{position:fixed;inset:0;background:rgba(8,8,10,.55);z-index:40}
+.scrim{position:fixed;inset:0;background:var(--scrim);z-index:40}
 .drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--surface);
   border-left:2px solid var(--ink);z-index:41;display:flex;flex-direction:column}
 .drawer > header{padding:18px 20px;border-bottom:1px solid var(--rule)}
@@ -393,6 +451,12 @@ footer.legalese{margin-top:40px;padding-top:16px;border-top:1px solid var(--rule
       <div class="sub">Projets, tâches déléguées et relances : lu et écrit par le serveur local</div>
     </div>
     <div class="health" id="health">
+      <label class="sr-only" for="theme">Habillage</label>
+      <select id="theme" class="choix-theme">
+        <option value="nuit">Nuit</option>
+        <option value="nuit-serif">Nuit serif</option>
+        <option value="jour">Jour</option>
+      </select>
       <button type="button" class="pill voyant warn" id="voyantBeeper" title="Vérification en cours…">
         <span class="dot"></span><span class="lbl">Beeper</span>
       </button>
@@ -2703,6 +2767,43 @@ agentInputEl.addEventListener('keydown', function(e){
 });
 
 
+/* ============================ habillage ============================
+   Trois habillages, definis entierement en jetons dans la feuille de style :
+   `nuit` (celui d'origine), `nuit-serif` (memes couleurs, titrage en romaine)
+   et `jour` (fond ivoire). Le choix vit sur <html data-theme> et rien d'autre
+   ne bouge : aucun composant ne connait le nom de l'habillage courant.
+
+   Il est pose une premiere fois par le petit script du <head>, avant le premier
+   rendu. Ce qui suit ne sert qu'a le changer et a s'en souvenir.
+*/
+var THEMES = ['nuit', 'nuit-serif', 'jour'];
+var CLE_THEME = 'secretariat-theme';
+
+// Un nom d'habillage inconnu (stockage bricole a la main, version anterieure,
+// faute de frappe) ne doit jamais laisser la page sans jetons : on retombe sur
+// la nuit, qui est la base dont les deux autres derivent.
+function themeValide(nom){
+  return THEMES.indexOf(nom) === -1 ? 'nuit' : nom;
+}
+
+function themeCourant(){
+  return themeValide(document.documentElement.getAttribute('data-theme'));
+}
+
+function appliquerTheme(nom){
+  var theme = themeValide(nom);
+  document.documentElement.setAttribute('data-theme', theme);
+  var sel = document.getElementById('theme');
+  if (sel && sel.value !== theme) sel.value = theme;
+  try {
+    window.localStorage.setItem(CLE_THEME, theme);
+  } catch (e) {
+    // Stockage indisponible : l'habillage tient pour cette session, et la page
+    // rouvrira en nuit. Sans consequence, rien ne justifie d'alerter.
+  }
+  return theme;
+}
+
 /* ============================ rapprochement avec la liste WhatsApp ============================
    A chaque ouverture, le serveur compare la derniere liste de taches envoyee dans
    la conversation WhatsApp a soi-meme avec la precedente, et avec le portefeuille.
@@ -3016,6 +3117,13 @@ async function lancerRapprochement(){
   if (data.aRetirer.length) afficherRetraits();
   else await etapeAjouts();
 }
+
+(function(){
+  var sel = document.getElementById('theme');
+  if (!sel) return;
+  sel.value = themeCourant();
+  sel.addEventListener('change', function(){ appliquerTheme(sel.value); });
+})();
 
 charger().then(function(){ chargerSemaine(); return lancerRapprochement(); });
 </script>

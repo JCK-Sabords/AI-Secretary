@@ -232,7 +232,12 @@ Toutes ecrivent dans les memes fichiers de `data/projects/` et `data/people.md`.
 
 2. **Note a soi-meme dans Beeper** : l'agent hebdomadaire lit les messages non traites du fil
    designe dans `data/config.json` (`filNoteASoiMeme`) et les transforme en taches.
-3. **Dashboard** (`http://127.0.0.1:5556`) : le panneau « Ma semaine » porte le top 5 des
+3. **Dashboard** (`http://127.0.0.1:5556`) : un selecteur dans le bandeau bascule entre trois
+   habillages, **Nuit** (l'origine), **Nuit serif** (memes couleurs, titrage en romaine) et
+   **Jour** (fond ivoire). Le choix est retenu d'une session a l'autre et pose avant le premier
+   rendu, pour que la page ne clignote pas. Tout ce qui les distingue tient en jetons CSS dans
+   les blocs `[data-theme=...]` de `web/index.html` : aucune couleur ne doit etre ecrite ailleurs,
+   un test le verifie. S'y ajoutent le panneau « Ma semaine » porte le top 5 des
    taches a faire, etabli par Claude a chaque ouverture (`GET /api/semaine`,
    `server/semaine.js`), chacune avec sa reference, sa priorite, son projet, une
    justification, son echeance et la part de cette tache delegable a une IA. Un bouton
