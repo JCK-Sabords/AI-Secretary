@@ -4,11 +4,11 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-// Trois habillages partagent une seule feuille de style : `nuit` (l'origine),
-// `nuit-serif` et `jour`. Tout ce qui les distingue tient en jetons. Ces tests
-// gardent cette propriete, parce qu'elle ne se voit pas : une couleur ecrite en
-// dur passe inapercue en nuit et donne, en jour, du texte sombre sur fond
-// sombre a un endroit ou personne ne regarde.
+// Deux habillages partagent une seule feuille de style : `nuit` (l'origine) et
+// `jour`. Tout ce qui les distingue tient en jetons. Ces tests gardent cette
+// propriete, parce qu'elle ne se voit pas : une couleur ecrite en dur passe
+// inapercue en nuit et donne, en jour, du texte sombre sur fond sombre a un
+// endroit ou personne ne regarde.
 
 function source() {
   return fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf8');
@@ -41,10 +41,9 @@ function jetons(texte) {
 
 const BASE = ':root, [data-theme="nuit"]';
 
-test('les trois habillages sont declares', () => {
+test('les deux habillages sont declares', () => {
   const css = feuilleDeStyle();
   assert.ok(css.includes(BASE), 'nuit est la base');
-  assert.ok(css.includes('[data-theme="nuit-serif"]'));
   assert.ok(css.includes('[data-theme="jour"]'));
 });
 
@@ -67,12 +66,13 @@ test('l habillage jour redefinit toutes les couleurs de la base', () => {
   assert.ok(couleursBase.length >= 18, 'la base doit porter tous les jetons');
 });
 
-test('l habillage nuit serif ne touche qu a la typographie', () => {
-  const noms = jetons(bloc('[data-theme="nuit-serif"]'));
-  assert.ok(noms.length > 0);
-  noms.forEach((n) => {
-    assert.match(n, /^--(display|titre)/,
-      n + ' ne devrait pas changer dans un habillage qui ne change que la voix');
+// La romaine a ete retenue pour les deux habillages. Si un habillage se
+// remettait a redefinir une police, les deux ne se distingueraient plus
+// seulement par leurs couleurs et ce fichier ne garderait plus rien.
+test('l habillage jour ne touche qu aux couleurs', () => {
+  jetons(bloc('[data-theme="jour"]')).forEach((n) => {
+    assert.doesNotMatch(n, /^--(display|titre|body|mono)/,
+      n + ' ne devrait pas changer dans un habillage qui ne change que la lumiere');
   });
 });
 
@@ -80,7 +80,7 @@ test('l habillage nuit serif ne touche qu a la typographie', () => {
 // changement de theme.
 test('aucune couleur n est ecrite en dur hors des habillages', () => {
   let css = feuilleDeStyle();
-  [BASE, '[data-theme="nuit-serif"]', '[data-theme="jour"]'].forEach((sel) => {
+  [BASE, '[data-theme="jour"]'].forEach((sel) => {
     const i = css.indexOf(sel);
     const fin = css.indexOf('}', css.indexOf('{', i));
     css = css.slice(0, i) + css.slice(fin + 1);
@@ -108,24 +108,25 @@ test('l habillage est pose dans le head, avant le premier rendu', () => {
 test('le script de pose et le script principal s accordent', () => {
   const s = source();
   assert.strictEqual((s.match(/secretariat-theme/g) || []).length, 2);
-  assert.strictEqual((s.match(/\['nuit', 'nuit-serif', 'jour'\]/g) || []).length, 2);
+  assert.strictEqual((s.match(/\['nuit', 'jour'\]/g) || []).length, 2);
 });
 
 function chargerThemeValide() {
   const m = /function themeValide\(nom\)\{[\s\S]*?\n\}/.exec(source());
   assert.ok(m, 'themeValide doit exister');
-  return new Function("var THEMES = ['nuit', 'nuit-serif', 'jour'];\n" + m[0] +
+  return new Function("var THEMES = ['nuit', 'jour'];\n" + m[0] +
     '\nreturn themeValide;')();
 }
 
 test('un habillage inconnu retombe sur la nuit', () => {
   const themeValide = chargerThemeValide();
   assert.strictEqual(themeValide('nuit'), 'nuit');
-  assert.strictEqual(themeValide('nuit-serif'), 'nuit-serif');
   assert.strictEqual(themeValide('jour'), 'jour');
-  // Stockage bricole a la main, version anterieure, faute de frappe : aucun ne
-  // doit laisser la page sans jetons.
-  ['clair', '', null, undefined, 'NUIT', 'jour ', 42].forEach((mauvais) => {
+  // Stockage bricole a la main, faute de frappe, ou choix `nuit-serif` retenu
+  // du temps ou les deux titrages etaient proposes : aucun ne doit laisser la
+  // page sans jetons. Pour `nuit-serif`, retomber sur `nuit` ne change rien a
+  // l'ecran, puisque la nuit porte desormais cette meme romaine.
+  ['nuit-serif', 'clair', '', null, undefined, 'NUIT', 'jour ', 42].forEach((mauvais) => {
     assert.strictEqual(themeValide(mauvais), 'nuit', JSON.stringify(mauvais));
   });
 });
@@ -142,13 +143,42 @@ test('la lecture et l ecriture du choix sont protegees', () => {
   assert.match(appliquer[0], /try\s*\{[\s\S]*setItem[\s\S]*catch/);
 });
 
-test('le selecteur propose les trois habillages et porte un nom', () => {
+test('le selecteur propose les deux habillages et porte un nom', () => {
   const s = source();
   const sel = /<select id="theme"[\s\S]*?<\/select>/.exec(s);
   assert.ok(sel, 'le selecteur doit exister');
-  ['nuit', 'nuit-serif', 'jour'].forEach((t) => {
+  ['nuit', 'jour'].forEach((t) => {
     assert.ok(sel[0].includes('value="' + t + '"'), t + ' doit etre proposable');
   });
+  assert.ok(!sel[0].includes('nuit-serif'),
+    'l habillage retire ne doit plus etre proposable');
   assert.match(s, /<label class="sr-only" for="theme">/,
     'un selecteur sans texte visible doit garder une etiquette lisible');
+});
+
+/* ---------- largeur et respiration ---------- */
+
+// Le tableau de bord tient sur presque toute la largeur de la fenetre. Une
+// colonne figee au milieu laissait deux bandes vides sur un ecran large, et le
+// portefeuille, qui est un tableau a sept colonnes, y etait comprime.
+test('le conteneur suit la largeur de la fenetre', () => {
+  const declarations = bloc('.wrap{');
+  assert.match(declarations, /padding\s*:\s*0 clamp\(/,
+    'la marge laterale doit suivre la fenetre, pas une valeur fixe');
+  const plafond = /max-width\s*:\s*(\d+)px/.exec(declarations);
+  assert.ok(plafond, 'un plafond doit rester, pour les tres grands ecrans');
+  assert.ok(Number(plafond[1]) >= 1600,
+    'un plafond de ' + plafond[1] + 'px reproduirait la colonne etroite');
+});
+
+// La typographie retenue est une romaine, choisie apres comparaison. Le jeton
+// est unique : le titrage de toute la page en depend.
+test('le titrage est en romaine', () => {
+  const base = bloc(BASE);
+  assert.match(base, /--display\s*:\s*"Newsreader"/);
+  assert.match(base, /--titre\s*:\s*"Newsreader"/);
+  // La police abandonnee ne doit plus etre telechargee : la requete serait
+  // payee a chaque chargement sans que rien ne s'en serve.
+  assert.ok(!source().includes('Bricolage'),
+    'la police abandonnee ne doit plus etre chargee');
 });

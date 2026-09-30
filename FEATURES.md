@@ -1015,3 +1015,34 @@ choix sont protegees : en navigation privee, l'habillage tient pour la session.
 
 Le harnais de `test/web.charger.test.js` a gagne un `documentElement` : son faux document n'en
 avait pas, et le script le lit desormais au chargement.
+
+## Iteration 39 : un seul titrage, et toute la largeur de la fenetre
+
+L'iteration precedente proposait trois habillages pour trancher entre deux titrages. Le
+choix est fait : la romaine l'emporte, en nuit comme en jour.
+
+### Ce que ca change
+
+**`nuit-serif` disparait.** Sa typographie est devenue celle de tout le monde, donc
+l'habillage n'avait plus rien a redefinir. Il ne reste que la nuit et le jour, qui ne
+different plus que par la lumiere. Un choix `nuit-serif` encore en memoire retombe sur
+`nuit` : la regle de repli existait deja, et comme la nuit porte desormais cette meme
+romaine, la bascule ne se voit pas a l'ecran.
+
+**Bricolage Grotesque n'est plus telechargee.** Plus rien ne s'en servait : la requete
+aurait ete payee a chaque chargement pour une police jamais dessinee. Un test le verifie,
+parce qu'une police abandonnee dans un lien ne se voit par definition nulle part.
+
+**Le tableau de bord occupe presque toute la largeur.** La marge laterale suit la fenetre
+(`clamp(28px, 3.4vw, 72px)`) au lieu d'une colonne figee a 1200 px qui laissait deux bandes
+vides sur un ecran large et comprimait le portefeuille, qui est un tableau a sept colonnes.
+Un plafond de 2000 px reste, pour les tres grands ecrans ou une ligne qui traverse tout
+devient penible a lire.
+
+**Tout respire d'un cran** : marges du bandeau, ecart entre les deux panneaux transverses,
+hauteur des lignes de projet et de tache, colonnes de la grille des taches. Le gain de
+largeur sans le gain d'air aurait seulement etale la meme densite.
+
+Deux tests nouveaux tiennent ces deux points : le conteneur doit garder une marge laterale
+relative et un plafond assez haut pour ne pas reproduire la colonne etroite, et le titrage
+doit rester une romaine.
