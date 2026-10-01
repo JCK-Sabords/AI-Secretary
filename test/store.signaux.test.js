@@ -168,3 +168,52 @@ test('signal 6 : une echeance qui tombe exactement aujourd hui n est pas un reta
   assert.strictEqual(store.signals(p, AUJ).echeanceProche, true);
   assert.strictEqual(store.severity(p, AUJ), 'warn');
 });
+
+/* ---------- ordre des taches d'un projet ---------- */
+
+// openTasks est le seul endroit ou les taches d'un projet sont classees : le
+// tableau de bord, l'export mobile, la liste WhatsApp et l'agent hebdomadaire en
+// dependent tous. Une seule d'entre elles qui trierait de son cote finirait par
+// presenter une autre sequence sans que rien ne le signale.
+test('openTasks rend les taches par priorite decroissante', () => {
+  const p = projet({taches: [
+    tache({n: 1, prio: 'P3'}),
+    tache({n: 2, prio: 'P1'}),
+    tache({n: 3, prio: 'P4'}),
+    tache({n: 4, prio: 'P2'})]});
+  assert.deepStrictEqual(store.openTasks(p).map((t) => t.n), [2, 4, 1, 3]);
+});
+
+// L'ordre du fichier est celui que le proprietaire etablit par glisser-deposer.
+// Il reste le departage a priorite egale, et le tri doit etre stable pour le
+// preserver : sans cela deux taches de meme priorite permuteraient d'un rendu a
+// l'autre sans que rien n'ait bouge.
+test('openTasks garde l ordre du fichier a priorite egale', () => {
+  const p = projet({taches: [
+    tache({n: 7, prio: 'P2'}),
+    tache({n: 3, prio: 'P1'}),
+    tache({n: 5, prio: 'P2'}),
+    tache({n: 9, prio: 'P1'}),
+    tache({n: 1, prio: 'P2'})]});
+  assert.deepStrictEqual(store.openTasks(p).map((t) => t.n), [3, 9, 7, 5, 1]);
+});
+
+// Une priorite absente ou hors liste ne doit pas s'imposer en tete de projet :
+// une tache ecrite a la main sans `prio` passerait devant les P1.
+test('openTasks place une priorite inattendue en queue', () => {
+  const p = projet({taches: [
+    tache({n: 1, prio: ''}),
+    tache({n: 2, prio: 'P4'}),
+    tache({n: 3, prio: 'P1'})]});
+  assert.deepStrictEqual(store.openTasks(p).map((t) => t.n), [3, 2, 1]);
+});
+
+// Le classement ne doit pas reecrire le projet : openTasks est lue partout, y
+// compris sur des projets charges une fois et relus plusieurs fois.
+test('openTasks ne reordonne pas le projet lui-meme', () => {
+  const p = projet({taches: [
+    tache({n: 1, prio: 'P3'}),
+    tache({n: 2, prio: 'P1'})]});
+  store.openTasks(p);
+  assert.deepStrictEqual(p.taches.map((t) => t.n), [1, 2]);
+});

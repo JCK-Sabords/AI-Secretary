@@ -297,8 +297,16 @@ Toutes ecrivent dans les memes fichiers de `data/projects/` et `data/people.md`.
    tache P1 terminee maintiendrait le projet en P1 indefiniment ; quand toutes les taches
    sont closes, aucune pastille n'est affichee. Le nombre, lui, compte toutes les taches.
 
-   Sur chaque ligne de tache : une poignee (`⋮⋮`) glisser-deposer pour reordonner les taches
-   d'un projet (et, de la meme facon, les projets entre eux) ; un clic sur une cellule visible
+   A l'interieur d'un projet, les taches sont classees par priorite decroissante, P1 en tete.
+   Ce classement vit a un seul endroit (`openTasks` dans `server/store.js`, repris a
+   l'identique par le tableau de bord) pour que l'ecran, l'export mobile, la liste WhatsApp
+   et l'agent hebdomadaire presentent tous la meme sequence. A priorite egale, l'ordre
+   etabli au glisser-deposer departage.
+
+   Sur chaque ligne de tache : une poignee (`⋮⋮`) glisser-deposer pour ranger les taches
+   a l'interieur de leur priorite (et, de la meme facon, les projets entre eux) ; deposer
+   une tache parmi des taches d'une autre priorite la fait passer a cette priorite, sans
+   quoi le tri la ramenerait aussitot dans son groupe et le geste semblerait ignore ; un clic sur une cellule visible
    (titre, responsable, echeance) l'ouvre en edition en place, enregistree a la perte
    du focus ou a la selection dans une liste deroulante, Entree validant un champ texte et
    Echap annulant sans rien envoyer. Pour les champs a choix (priorite, responsable)

@@ -1046,3 +1046,38 @@ largeur sans le gain d'air aurait seulement etale la meme densite.
 Deux tests nouveaux tiennent ces deux points : le conteneur doit garder une marge laterale
 relative et un plafond assez haut pour ne pas reproduire la colonne etroite, et le titrage
 doit rester une romaine.
+
+## Iteration 40 : les taches d'un projet se lisent par priorite
+
+Un projet deplie montrait ses taches dans l'ordre du fichier. Sur un projet qui en porte
+huit, comme « Autre », une P1 pouvait se trouver en sixieme position : il fallait parcourir
+toute la liste pour savoir par quoi commencer, alors que c'est precisement la question que
+le projet pose quand on le deplie.
+
+### Ce que ca change
+
+**Les taches sortent de la plus prioritaire a la moins prioritaire.** A priorite egale,
+l'ordre du fichier departage, c'est-a-dire celui que le proprietaire a etabli par
+glisser-deposer : le geste garde donc un sens, a l'interieur d'une priorite.
+
+**Le classement vit a un seul endroit.** `openTasks` dans `server/store.js` le tient, et le
+tableau de bord reprend la meme regle parce qu'il lit `p.taches` directement. L'export
+mobile, la liste WhatsApp, le panneau « Ma semaine » et les relances passent tous par
+`openTasks` et presentent donc la meme sequence. Un test compare les deux implementations
+sur le meme jeu de taches : une divergence ne produirait aucune erreur, juste deux
+classements differents pour les memes taches, ce qui ne se remarque pas.
+
+**`prochaineAction` n'a plus son propre parcours.** Elle cherchait la tache la plus
+prioritaire par une boucle ; c'est devenu `openTasks(project)[0]`. Deux classements qui
+disaient la meme chose pouvaient se mettre a diverger, il n'en reste qu'un.
+
+**Un glisser-deposer qui franchit une priorite change la priorite.** C'est le point qui
+demandait une decision plutot qu'un tri. Deposer une tache parmi des P1 n'aurait rien pu
+produire de visible, puisque le tri l'aurait aussitot ramenee dans son groupe : le geste
+aurait paru ignore. Il est donc lu pour ce qu'il dit, la priorite suit la destination. Le
+changement de priorite et le rangement partent dans le meme lot d'operations, pour qu'une
+tache repriorisee ne se retrouve pas au mauvais rang de son nouveau groupe si la seconde
+operation echouait.
+
+**Une priorite absente ou hors liste passe en queue**, jamais en tete : une tache ecrite a
+la main sans `prio` ne doit pas s'imposer devant les P1.

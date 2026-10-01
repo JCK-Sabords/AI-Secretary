@@ -766,8 +766,24 @@ function editorHtml(p, t){
       (isNew ? '' : '<button class="btn danger" type="button" data-del="' + esc(p.id) + ':' + t.n + '">Supprimer</button>') +
     '</div></div></div>';
 }
+// Rang de tri d'une tache : la priorite la plus forte en tete. Une priorite
+// absente ou hors liste passe derriere tout le reste plutot que devant, pour
+// qu'une valeur inattendue ne s'impose pas en tete de projet.
+// Repris de `rangPrio` dans server/store.js, qui tient le meme ordre pour
+// l'export mobile, la liste WhatsApp et l'agent hebdomadaire.
+var RANG_PRIO = {P1: 1, P2: 2, P3: 3, P4: 4};
+function rangPrio(t){ return RANG_PRIO[t.prio] || 99; }
+
+// A priorite egale, l'ordre du fichier departage, c'est-a-dire celui que le
+// proprietaire a etabli par glisser-deposer. Le tri doit donc etre stable, sans
+// quoi deux taches de meme priorite permuteraient d'un rendu a l'autre sans que
+// rien n'ait bouge ; Array.prototype.sort l'est depuis ES2019.
+function parPriorite(taches){
+  return taches.slice().sort(function(a, b){ return rangPrio(a) - rangPrio(b); });
+}
+
 function tasksHtml(p){
-  var visibles = (p.taches || []).filter(function(t){ return !pendingDeletes[refOf(p, t)]; });
+  var visibles = parPriorite((p.taches || []).filter(function(t){ return !pendingDeletes[refOf(p, t)]; }));
   var body = visibles.map(function(t){
     if (editing && editing.pid === p.id && editing.n === t.n) return editorHtml(p, t);
     return taskHtml(p, t);
@@ -2680,6 +2696,15 @@ function deplacerProjet(sourceId, targetId){
   ids.splice(to, 0, sourceId);
   envoyerOps([{op: 'reorder_projects', ids: ids}]);
 }
+// Les taches s'affichent par priorite (voir parPriorite). Un glisser-deposer qui
+// reste dans une meme priorite range donc bien ce que l'ecran montre. Mais un
+// glisser qui franchit une priorite ne pourrait rien produire de visible : le tri
+// remettrait aussitot la tache dans son groupe, et le geste semblerait ignore.
+//
+// Il est donc lu pour ce qu'il dit : deposer une tache parmi des P1, c'est la
+// passer en P1. La priorite suit la destination, et le rangement dans le groupe
+// d'arrivee est envoye dans le meme lot, pour que les deux changements vivent ou
+// echouent ensemble plutot que de laisser une tache repriorisee au mauvais rang.
 function deplacerTache(pid, sourceN, targetN){
   var p = projectById(pid);
   if (!p) return;
@@ -2688,7 +2713,14 @@ function deplacerTache(pid, sourceN, targetN){
   if (from < 0 || to < 0 || from === to) return;
   ns.splice(from, 1);
   ns.splice(to, 0, sourceN);
-  envoyerOps([{op: 'reorder_tasks', projet: pid, ordre: ns}]);
+  var ops = [];
+  var source = (p.taches || []).filter(function(t){ return t.n === sourceN; })[0];
+  var cible = (p.taches || []).filter(function(t){ return t.n === targetN; })[0];
+  if (source && cible && source.prio !== cible.prio) {
+    ops.push({op: 'update_task', ref: p.prefixe + sourceN, champs: {prio: cible.prio}});
+  }
+  ops.push({op: 'reorder_tasks', projet: pid, ordre: ns});
+  envoyerOps(ops);
 }
 
 document.addEventListener('dragstart', function(e){

@@ -168,12 +168,29 @@ function addDays(iso, n) {
 }
 
 // Toutes les taches d'un projet sont ouvertes : le portefeuille ne contient que
-// du travail a faire. Cette fonction ne filtre donc plus rien, mais elle reste,
-// et elle reste utilisee partout. Elle nomme l'intention (« les taches sur
-// lesquelles il y a quelque chose a faire ») au lieu de la supposer, et c'est
-// elle qu'il faudra changer si un etat autre que « presente » revenait un jour.
+// du travail a faire. Cette fonction ne filtre donc rien, mais elle reste, et elle
+// reste utilisee partout. Elle nomme l'intention (« les taches sur lesquelles il y
+// a quelque chose a faire ») au lieu de la supposer, et c'est elle qu'il faudra
+// changer si un etat autre que « presente » revenait un jour.
+//
+// Elle rend les taches dans l'ordre ou il faut les lire : par priorite decroissante
+// d'abord. Ce classement est le seul endroit ou il est fait, pour que le tableau de
+// bord, l'export mobile, la liste WhatsApp et l'agent hebdomadaire presentent tous
+// la meme sequence ; une seule d'entre elles qui trierait de son cote finirait par
+// diverger sans que rien ne le signale.
+//
+// A priorite egale, l'ordre du fichier departage, c'est-a-dire celui que le
+// proprietaire a etabli par glisser-deposer. Le tri doit donc etre stable, et
+// `Array.prototype.sort` l'est depuis ES2019 : sans cette garantie, deux taches de
+// meme priorite pourraient permuter d'un rendu a l'autre sans que rien n'ait bouge.
+const RANG_PRIO = {P1: 1, P2: 2, P3: 3, P4: 4};
+function rangPrio(tache) {
+  // Une priorite absente ou hors liste passe derriere tout le reste plutot que
+  // devant : une valeur inattendue ne doit pas s'imposer en tete de projet.
+  return RANG_PRIO[tache.prio] || 99;
+}
 function openTasks(project) {
-  return (project.taches || []).slice();
+  return (project.taches || []).slice().sort((a, b) => rangPrio(a) - rangPrio(b));
 }
 
 // Prochaine action d un projet : elle n est plus saisie a la main, elle se deduit
@@ -186,18 +203,11 @@ function openTasks(project) {
 // ce dernier cas seulement, le champ texte `prochaine_action` du fichier garde son
 // role : il reste la seule facon de dire ce qu il faut faire sur un projet qui ne
 // porte pas encore de tache.
-const RANG_PRIO = {P1: 1, P2: 2, P3: 3, P4: 4};
 function prochaineAction(project) {
-  const ouvertes = openTasks(project);
-  if (ouvertes.length === 0) return null;
-  let meilleure = null;
-  ouvertes.forEach((t) => {
-    const rang = RANG_PRIO[t.prio] || 99;
-    // Comparaison stricte : a egalite on ne remplace pas, donc la premiere
-    // rencontree dans l ordre de la liste l emporte.
-    if (meilleure === null || rang < (RANG_PRIO[meilleure.prio] || 99)) meilleure = t;
-  });
-  return meilleure;
+  // openTasks rend deja les taches dans cet ordre exactement : la plus prioritaire
+  // en tete, l ordre du fichier departageant les ex aequo. Il n y a donc plus de
+  // second classement a tenir ici, et aucun risque que les deux divergent.
+  return openTasks(project)[0] || null;
 }
 
 function signals(project, today) {
@@ -429,5 +439,5 @@ function applyOps(projects, ops, today) {
 module.exports = {InvalidProjectError, parseProject, serializeProject,
   TASK_FIELDS, TASK_DEFAULTS, PROJECT_DEFAULTS,
   refOf, parseRef, findByRef, nextTaskNumber, allocatePrefix,
-  daysBetween, addDays, openTasks, prochaineAction, signals, severity,
+  daysBetween, addDays, openTasks, rangPrio, prochaineAction, signals, severity,
   applyOps, DOMAINES, DOMAINES_PROJET, idValide};
