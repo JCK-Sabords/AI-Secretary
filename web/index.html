@@ -162,6 +162,14 @@ ul{margin:0;padding:0}
 .wk .meta .proj{font-family:var(--mono);font-size:9px;letter-spacing:.06em;
   text-transform:uppercase;color:var(--muted);opacity:.85}
 .wk .pourquoi{font-size:12px;color:var(--muted);line-height:1.4;flex-basis:100%}
+/* Une romaine a 500 sur fond ivoire parait plus fine que la meme sur charbon :
+   a couleur egale, le trait clair sur fond sombre bave et epaissit, le trait
+   sombre sur fond clair non. Les intitules de « Ma semaine » gagnent donc un
+   cran de graisse en jour, et leur justification passe du gris de service au
+   gris de texte. Rien de tout cela ne sert en nuit, ou ces lignes sont deja
+   assez presentes : la correction est donc portee par le seul habillage jour. */
+[data-theme="jour"] .wk .quoi b{font-weight:600}
+[data-theme="jour"] .wk .pourquoi{color:var(--ink-2)}
 .wk .due{font-family:var(--mono);font-size:12px;color:var(--ink-2);white-space:nowrap}
 .wk .due.late{color:var(--crit);font-weight:600}
 .wk .due.proche{color:var(--warn);font-weight:600}
@@ -281,6 +289,16 @@ td.date.none{color:var(--muted)}
   font-size:12px;user-select:none;line-height:1}
 .handle:active{cursor:grabbing}
 .rowactions{display:flex;gap:4px;justify-self:end}
+/* Sur une ligne de projet, le meme nom habille un <td>. Il doit rester une
+   cellule de tableau : en boite flex il sortirait du calcul de hauteur de la
+   ligne et sa bordure basse ne rejoindrait plus celle des autres cellules,
+   interrompant le filet sous les icones. Les boutons sont donc alignes sans
+   changer le display de la cellule. */
+td.rowactions{display:table-cell;white-space:nowrap;text-align:right}
+/* .iconbtn est en display:grid, donc de niveau bloc : dans une cellule de
+   tableau les trois boutons s empileraient au lieu de s aligner. */
+td.rowactions > *{vertical-align:middle;display:inline-grid}
+td.rowactions > * + *{margin-left:4px}
 .iconbtn{width:22px;height:22px;display:grid;place-items:center;background:transparent;
   border:1px solid var(--rule);color:var(--ink-2);cursor:pointer;padding:0;font-size:12px;
   line-height:1;flex:none}

@@ -182,3 +182,29 @@ test('le titrage est en romaine', () => {
   assert.ok(!source().includes('Bricolage'),
     'la police abandonnee ne doit plus etre chargee');
 });
+
+/* ---------- lisibilite et filets ---------- */
+
+// `.rowactions` habille deux choses : un <span> sur une ligne de tache, ou flex
+// est le bon affichage, et un <td> sur une ligne de projet. Un td en boite flex
+// sort de la mise en page du tableau : il ne prend plus la hauteur de sa ligne,
+// et sa bordure basse se dessine plus haut que celle des autres cellules, ce qui
+// interrompt le filet sous les trois icones. Rien ne leve, le filet est
+// simplement coupe, d'ou ce test.
+test('la cellule d actions d une ligne de projet reste une cellule de tableau', () => {
+  const declarations = bloc('td.rowactions{');
+  assert.match(declarations, /display\s*:\s*table-cell/,
+    'un td.rowactions en flex couperait le filet de la ligne');
+  // Les boutons sont en display:grid, donc de niveau bloc : sans cette reprise
+  // ils s empileraient verticalement dans la cellule au lieu de s aligner.
+  assert.match(bloc('td.rowactions > *{'), /display\s*:\s*inline-grid/);
+});
+
+// Une romaine a 500 sur fond ivoire parait plus fine que la meme sur charbon :
+// a couleur egale, le trait clair sur fond sombre epaissit, le trait sombre sur
+// fond clair non. Les intitules de « Ma semaine » compensent en jour seulement.
+test('les intitules de Ma semaine sont renforces en jour', () => {
+  const css = feuilleDeStyle();
+  assert.match(css, /\[data-theme="jour"\] \.wk \.quoi b\{[^}]*font-weight\s*:\s*600/);
+  assert.match(css, /\[data-theme="jour"\] \.wk \.pourquoi\{[^}]*color\s*:\s*var\(--ink-2\)/);
+});

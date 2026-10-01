@@ -1081,3 +1081,30 @@ operation echouait.
 
 **Une priorite absente ou hors liste passe en queue**, jamais en tete : une tache ecrite a
 la main sans `prio` ne doit pas s'imposer devant les P1.
+
+## Iteration 41 : le filet des lignes de projet, et la lisibilite de Ma semaine en jour
+
+Deux defauts signales a l'usage, l'un visible seulement en jour.
+
+### Le filet coupe sous les icones
+
+`.rowactions` habille deux elements differents : un `<span>` sur une ligne de tache, ou
+`display:flex` est le bon affichage, et un `<td>` sur une ligne de projet, qui reprenait le
+meme nom de classe et passait donc lui aussi en flex. Un `td` en boite flex sort de la mise
+en page du tableau : il ne prend plus la hauteur de sa ligne. Mesure faite, sa bordure basse
+se dessinait 31 px plus haut que celle des cellules voisines, d'ou le filet interrompu sous
+les boutons `+`, crayon et `×`.
+
+La cellule redevient une `table-cell`, et ses boutons passent en `inline-grid` : ils sont en
+`display:grid`, donc de niveau bloc, et se seraient empiles verticalement dans la cellule.
+Un test tient les deux points, parce que ce defaut ne leve rien et ne se voit qu'en
+regardant le filet.
+
+### « Ma semaine » en habillage jour
+
+Une romaine a 500 sur fond ivoire parait plus fine que la meme sur charbon : a couleur
+egale, un trait clair sur fond sombre epaissit optiquement, un trait sombre sur fond clair
+non. Les intitules gagnent donc un cran de graisse en jour, et leur justification passe du
+gris de service (`--muted`) au gris de texte (`--ink-2`). La correction est portee par le
+seul habillage jour : en nuit ces lignes sont deja assez presentes, et les epaissir des deux
+cotes aurait abime ce qui marchait.
