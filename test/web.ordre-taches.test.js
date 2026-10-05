@@ -89,3 +89,48 @@ test('deposer une tache dans un autre groupe change sa priorite', () => {
     'les deux operations doivent vivre ou echouer ensemble');
   assert.match(corps[0], /envoyerOps\(ops\)/);
 });
+
+/* ---------- pastille de delegation sur chaque ligne de tache ---------- */
+
+// Le bouton « Déléguer » n'existait que dans « Ma semaine », donc pour cinq
+// taches. Il est desormais sur chaque ligne, avec la part delegable a l'IA.
+test('chaque ligne de tache porte sa pastille de delegation', () => {
+  const corps = /function taskHtml\(p, t\)\{[\s\S]*?\n\}/.exec(source());
+  assert.ok(corps, 'taskHtml doit exister');
+  assert.match(corps[0], /pastilleDelegation\(p, t\)/);
+});
+
+// La pastille est elle-meme le lien : une jauge, un pourcentage, rien d'autre.
+// Un bouton libelle aurait double la largeur de la colonne sans rien dire de plus.
+test('la pastille est le lien de delegation, et vise l application de bureau', () => {
+  const corps = /function pastilleDelegation\(p, t\)\{[\s\S]*?\n\}/.exec(source());
+  assert.ok(corps, 'pastilleDelegation doit exister');
+  assert.match(corps[0], /lienDelegation\(t, p, etat\.today\)/);
+  assert.match(corps[0], /class="tdeleg/);
+  // Un clic sur la pastille ne doit pas aussi ouvrir l'edition en place de la
+  // ligne : les deux gestes vivent au meme endroit.
+  assert.match(corps[0], /event\.stopPropagation\(\)/);
+});
+
+// L'estimation arrive par une requete separee : elle peut manquer au premier
+// rendu, ou si Claude est injoignable. La delegation, elle, n'en depend pas et
+// doit rester possible.
+test('la pastille reste cliquable sans estimation connue', () => {
+  const corps = /function pastilleDelegation\(p, t\)\{[\s\S]*?\n\}/.exec(source());
+  assert.match(corps[0], /typeof pct === 'number'/,
+    'l absence d estimation doit etre distinguee d un zero');
+  const i = corps[0].indexOf('href=');
+  const j = corps[0].indexOf('connu ?');
+  assert.ok(i !== -1 && (j === -1 || i < corps[0].lastIndexOf('href=') + 1),
+    'le lien ne doit jamais etre conditionne par la presence du pourcentage');
+});
+
+// Route separee de /api/etat : le calcul peut demander un appel a Claude, et le
+// tableau de bord doit s'afficher sans l'attendre.
+test('l estimation est chargee par une requete distincte, sans bloquer l affichage', () => {
+  const s = source();
+  assert.match(s, /fetch\('\/api\/delegation'\)/);
+  const amorce = /charger\(\)\.then\(function\(\)\{[^}]*\}\);/.exec(s);
+  assert.ok(amorce, 'l amorce doit exister');
+  assert.match(amorce[0], /chargerDelegation\(\)/);
+});

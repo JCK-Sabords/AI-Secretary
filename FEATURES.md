@@ -1159,3 +1159,58 @@ d'une ligne WhatsApp a un projet, et liste sortante. Toutes en beneficient. Les 
 prompts mesures ce jour-la restaient sous le plafond, « Ma semaine » a 18216 caracteres et
 la liste sortante a 22949, mais avec une marge qui se serait refermee a mesure que le
 portefeuille grossit.
+
+## Iteration 43 : la delegation a l'IA sur chaque tache, estimee une fois pour toutes
+
+Le bouton « Deleguer » et la part delegable a l'IA n'existaient que dans « Ma semaine »,
+donc pour cinq taches. Ils sont desormais sur chaque ligne, dans chaque projet deplie.
+
+### La pastille
+
+Un seul element porte les deux : une jauge courte, un pourcentage, et le lien qui ouvre une
+session Claude Code avec la demande deja ecrite. La question « est-ce que je delegue ca ? »
+et le geste de deleguer sont le meme mouvement, et un bouton libelle aurait double la
+largeur de la colonne sans rien dire de plus. La pastille s'allume au-dela du seuil de
+delegabilite, pour qu'un coup d'oeil sur un projet deplie suffise a reperer ou l'IA fait
+gagner du temps.
+
+L'estimation peut manquer, au premier rendu ou si Claude est injoignable. Le lien reste
+alors actif : la delegation n'en depend pas.
+
+### Le stockage, qui est le vrai sujet
+
+L'estimation existait deja, mais dans le cache de « Ma semaine », indexe sur une empreinte
+du **portefeuille entier**. Changer le titre d'une seule tache invalidait tout et relancait
+un classement complet. Inutilisable pour une estimation par tache.
+
+`server/delegation.js` tient donc un cache **par tache**, dans `data/history/delegation.json`.
+Mesures faites sur le portefeuille reel, 66 taches :
+
+| Situation | Appels a Claude | Duree |
+|---|---|---|
+| Premier calcul, cache vide | 3 lots | 84 s |
+| Rechargement, rien n'a change | **0** | 0,16 s |
+| Une tache modifiee | 1 | 9 s |
+
+**L'empreinte est volontairement etroite** : titre, effort, responsable et projet. Ni
+echeance ni priorite, qui disent quand faire la tache et jamais si une IA peut la faire a ma
+place. Reporter une echeance est l'operation la plus courante du tableau de bord ; l'inclure
+aurait fait repayer une estimation identique a chaque report. Un test le verifie.
+
+**Le decoupage en lots de 25 vient d'un defaut constate**, pas d'une precaution. Le premier
+essai envoyait les 66 taches en un prompt : le modele n'en renvoyait que 46, en omettant une
+vingtaine sans rien signaler. Le resultat finissait complet, les manquantes repartant au
+chargement suivant, mais il fallait deux passages. Par lots de 25 chaque reponse reste
+entiere, et un portefeuille neuf est couvert en une fois. Ce decoupage ne change rien au
+regime courant : une tache modifiee fait partir un lot d'une tache.
+
+**Les references disparues sortent du cache**, sinon le fichier grossirait indefiniment. Le
+risque de confusion n'existe pas, les numeros de tache n'etant jamais reattribues.
+
+### Un defaut rencontre en chemin
+
+`dictee.extraireJson` est specialise pour la dictee, dont la reponse a la forme
+`{ops, message}`, et normalise tout le reste a cette forme. Branche ici, il vidait
+silencieusement les estimations : le calcul aboutissait, l'appel durait ses douze secondes,
+et zero pourcentage en sortait. Ce module a donc son propre extracteur, et un test le
+distingue de celui de la dictee.

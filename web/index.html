@@ -274,7 +274,24 @@ td.date.none{color:var(--muted)}
    responsable, echeance, priorite, actions, chevron. Le nom de la classe est
    conserve, il est porte par une vingtaine d'endroits et ne designe pas un
    nombre de colonnes mais cette grille-la. */
-.grid8{display:grid;grid-template-columns:16px 60px 1fr 124px 104px 50px 62px;gap:16px;align-items:center}
+.grid8{display:grid;grid-template-columns:16px 60px 1fr 124px 104px 50px 74px 62px;gap:16px;align-items:center}
+/* Part delegable a l'IA sur une ligne de tache. La pastille est elle-meme le
+   lien de delegation : une jauge, un pourcentage et rien d'autre, plutot qu'un
+   bouton libelle qui aurait double la largeur de la colonne pour ne rien dire
+   de plus. Elle reste cliquable sans estimation, la delegation n'en depend pas. */
+.tdeleg{display:flex;align-items:center;gap:6px;text-decoration:none;color:var(--ink-2);
+  border:1px solid var(--rule);padding:3px 6px;white-space:nowrap;justify-self:end}
+.tdeleg:hover{border-color:var(--accent);color:var(--ink);background:var(--accent-soft)}
+.tdeleg .jauge{width:22px;height:3px;background:var(--rule);display:block;flex:none}
+.tdeleg .jauge i{display:block;height:100%;background:var(--accent)}
+.tdeleg b{font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:-.02em}
+/* Tache qui se delegue bien : la pastille s'allume, pour qu'un coup d'oeil sur
+   un projet deplie suffise a reperer ou l'IA fait gagner du temps. */
+.tdeleg.fort{border-color:var(--accent);color:var(--accent)}
+/* Estimation pas encore connue : la pastille reste, et reste cliquable, mais ne
+   montre pas de chiffre faux en attendant. */
+.tdeleg.vide{color:var(--muted)}
+.tdeleg.vide .jauge{opacity:.4}
 .tasks .hd{padding:8px;font-size:10px;font-weight:700;letter-spacing:var(--sc-label);
   text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--rule)}
 .task{padding:12px 10px;border-bottom:1px solid var(--rule-soft)}
@@ -683,6 +700,27 @@ function celluleTache(p, t, champ, affichageHtml){
   }
   return '<span class="cell" data-cell="' + esc(p.id) + ':' + t.n + ':' + champ + '">' + affichageHtml + '</span>';
 }
+// Pastille de delegation d'une ligne de tache : la part delegable a l'IA, et le
+// lien qui ouvre une session Claude Code avec la demande deja ecrite. Les deux
+// tiennent dans un seul element, parce que la question « est-ce que je delegue
+// ca ? » et le geste de deleguer sont le meme mouvement.
+//
+// Le pourcentage peut manquer : au premier affichage avant la reponse du
+// serveur, ou si Claude est injoignable. Le lien reste alors actif, il ne depend
+// pas de l'estimation.
+function pastilleDelegation(p, t){
+  var pct = delegParRef[refOf(p, t)];
+  var connu = typeof pct === 'number';
+  var fort = connu && pct >= SEUIL_DELEGABLE;
+  var titre = connu ? pct + ' % de cette tâche est délégable à l\'IA. Cliquer pour ouvrir une session Claude Code, demande pré-remplie.'
+    : 'Ouvrir une session Claude Code sur cette tâche, demande pré-remplie.';
+  return '<a class="tdeleg' + (fort ? ' fort' : '') + (connu ? '' : ' vide') + '" ' +
+    'href="' + esc(lienDelegation(t, p, etat.today)) + '" ' +
+    'title="' + esc(titre) + '" onclick="event.stopPropagation()">' +
+    '<span class="jauge"><i style="width:' + (connu ? pct : 0) + '%"></i></span>' +
+    '<b>' + (connu ? pct + '%' : '–') + '</b></a>';
+}
+
 function taskHtml(p, t){
   var ref = refOf(p, t);
   return '<div class="task grid8" data-ref="' + esc(ref) + '" data-pid="' + esc(p.id) + '" data-n="' + t.n + '">' +
@@ -692,6 +730,7 @@ function taskHtml(p, t){
     celluleTache(p, t, 'responsable', respHtml(t.responsable)) +
     celluleTache(p, t, 'echeance', dateHtml(t)) +
     celluleTache(p, t, 'prio', '<span class="prio ' + esc(t.prio.toLowerCase()) + '">' + esc(t.prio) + '</span>') +
+    pastilleDelegation(p, t) +
     '<span class="rowactions">' +
       '<button class="iconbtn round" type="button" data-edit="' + esc(p.id) + ':' + t.n + '" title="Édition complète">✎</button>' +
       '<button class="iconbtn danger" type="button" data-quickdel="' + esc(p.id) + ':' + t.n + '" title="Supprimer">×</button>' +
@@ -1153,6 +1192,24 @@ document.getElementById('wk').addEventListener('click', function(e){
 // Le calcul prend une trentaine de secondes quand le portefeuille a change : le
 // panneau affiche son attente au lieu de rester vide, et le reste du tableau de
 // bord ne l'attend pas.
+// Part de chaque tache delegable a l'IA, par reference. Remplie par
+// chargerDelegation, vide tant que la reponse n'est pas arrivee.
+var delegParRef = {};
+
+// Route separee de /api/etat : l'estimation peut demander un appel a Claude, et
+// le tableau de bord doit s'afficher sans l'attendre. Cote serveur, aucun appel
+// n'est lance quand aucune tache n'a change. Un echec reste silencieux : les
+// lignes gardent leur pastille sans chiffre, et la delegation marche quand meme.
+async function chargerDelegation(){
+  try {
+    var r = await fetch('/api/delegation');
+    var data = await r.json();
+    if (data && data.parRef) { delegParRef = data.parRef; renderBoard(); }
+  } catch (e) {
+    /* silencieux : voir ci-dessus */
+  }
+}
+
 async function chargerSemaine(){
   semaineEnCours = true;
   semaineErreur = null;
@@ -3177,5 +3234,5 @@ async function lancerRapprochement(){
   sel.addEventListener('change', function(){ appliquerTheme(sel.value); });
 })();
 
-charger().then(function(){ chargerSemaine(); return lancerRapprochement(); });
+charger().then(function(){ chargerSemaine(); chargerDelegation(); return lancerRapprochement(); });
 </script>

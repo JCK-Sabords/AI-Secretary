@@ -10,6 +10,7 @@ const sante = require('./sante');
 const lancement = require('./lancement');
 const devinerProjet = require('./deviner-projet');
 const semaine = require('./semaine');
+const delegation = require('./delegation');
 const listeSortante = require('./liste-sortante');
 const brouillon = require('./brouillon');
 // Nomme configuration et non config : envoyerRecap declare plus bas une
@@ -248,6 +249,17 @@ async function handle(req, body, ctx) {
   // de bord s'affiche sans elle et remplit le panneau a l'arrivee. Le resultat
   // est garde tant que le portefeuille ne bouge pas, pour ne pas depenser un
   // appel a chaque rechargement de page.
+  // Part de chaque tache delegable a une IA. Route distincte de /api/etat : le
+  // calcul peut demander un appel a Claude, et le tableau de bord doit s'afficher
+  // sans l'attendre. Quand rien n'a change, elle ne lance aucun appel.
+  if (req.method === 'GET' && url === '/api/delegation') {
+    try {
+      return {status: 200, json: await delegation.calculer(ctx)};
+    } catch (e) {
+      return {status: 200, json: {parRef: {}, erreur: 'estimation indisponible'}};
+    }
+  }
+
   if (req.method === 'GET' && url === '/api/semaine') {
     try {
       return {status: 200, json: await semaine.calculer(ctx)};

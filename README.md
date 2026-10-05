@@ -303,6 +303,14 @@ Toutes ecrivent dans les memes fichiers de `data/projects/` et `data/people.md`.
    et l'agent hebdomadaire presentent tous la meme sequence. A priorite egale, l'ordre
    etabli au glisser-deposer departage.
 
+   Sur chaque ligne de tache, une pastille de delegation : la part de la tache delegable a
+   une IA, et le lien qui ouvre une session Claude Code avec la demande deja ecrite. Les
+   estimations sont conservees tache par tache dans `data/history/delegation.json` : un
+   rechargement ne lance aucun appel a Claude tant que rien n'a change, et une modification
+   ne fait recalculer que la tache modifiee. L'empreinte qui decide de ce recalcul ne retient
+   que le titre, l'effort, le responsable et le projet : reporter une echeance ou changer une
+   priorite ne coute donc rien, ces champs ne disant pas si une IA peut faire le travail.
+
    Sur chaque ligne de tache : une poignee (`⋮⋮`) glisser-deposer pour ranger les taches
    a l'interieur de leur priorite (et, de la meme facon, les projets entre eux) ; deposer
    une tache parmi des taches d'une autre priorite la fait passer a cette priorite, sans
