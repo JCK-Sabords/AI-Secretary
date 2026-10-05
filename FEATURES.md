@@ -1108,3 +1108,54 @@ non. Les intitules gagnent donc un cran de graisse en jour, et leur justificatio
 gris de service (`--muted`) au gris de texte (`--ink-2`). La correction est portee par le
 seul habillage jour : en nuit ces lignes sont deja assez presentes, et les epaissir des deux
 cotes aurait abime ce qui marchait.
+
+## Iteration 42 : le prompt passe par l'entree standard, plus par la ligne de commande
+
+La dictee repondait « Claude n'a pas pu etre interroge : spawn ENAMETOOLONG ». Ce n'etait
+pas intermittent : elle etait cassee en permanence.
+
+### La cause
+
+Le prompt partait en argument unique de la ligne de commande lancant `claude`. Windows
+plafonne une ligne de commande a 32767 caracteres et refuse de creer le processus au-dela,
+avec `ENAMETOOLONG`. Mesure faite avant le correctif, sur le portefeuille reel : prompt de
+**35154 caracteres**, ligne de commande de **35166**, soit 2400 de trop. L'appel n'etait
+jamais lance, et le message « Claude n'a pas pu etre interroge » disait donc vrai.
+
+Un garde-fou existait pourtant, `LIMITE_PROMPT = 24000`. Il n'a pas joue parce que sa boucle
+de reduction ne savait retirer que les projets **sans aucune tache ouverte**. Sur 11 projets,
+2 seulement etaient dans ce cas : elle les retirait, ce qui ne suffisait pas, puis sortait
+en laissant le prompt a 35000 sans que rien ne le signale. Le garde-fou avait ete ecrit
+quand le portefeuille etait petit et reposait sur une hypothese qui ne tenait plus.
+
+### Le correctif
+
+**Le prompt est ecrit sur l'entree standard du processus.** Le binaire accepte les deux
+formes, son propre message d'erreur le dit : « Input must be provided either through stdin
+or as a prompt argument ». Verifie par un vrai appel avant d'ecrire le correctif, puis par
+un second avec le prompt complet de 36719 caracteres, qui aboutit la ou le plafond est a
+32767. La ligne de commande garde desormais une taille fixe, `['-p', '--tools', '']`, quelle
+que soit la taille du portefeuille. Un test compare la ligne produite pour un prompt d'un
+caractere et pour un prompt de 500000 : elles doivent etre identiques.
+
+**Du meme coup, la question de l'ordre des drapeaux disparait.** `--tools` est variadique, et
+un prompt place apres lui etait avale comme un nom d'outil : c'etait le defaut corrige le
+2026-09-15. Il ne peut plus se reproduire, puisque le prompt n'est plus un argument.
+
+**La limite de taille reste, mais change de raison et d'echelle.** Elle ne protege plus le
+systeme d'exploitation, elle borne ce que le modele doit lire : 200000 caracteres, soit
+environ 50000 jetons, assez haut pour ne jamais se declencher sur un portefeuille personnel,
+assez bas pour qu'un dossier devenu aberrant ne parte pas en entier.
+
+**La reduction sait maintenant aboutir.** A defaut de projet sans tache, le projet le plus
+volumineux part, car c'est celui qui rapproche le plus vite de la limite. Un test construit
+60 projets portant tous une tache, cas exact ou l'ancienne boucle abandonnait.
+
+### Portee
+
+Les cinq fonctions qui interrogent Claude passent par le meme lanceur
+(`dictee.lancerClaudeReel`) : dictee, « Ma semaine », brouillon de relance, rattachement
+d'une ligne WhatsApp a un projet, et liste sortante. Toutes en beneficient. Les deux autres
+prompts mesures ce jour-la restaient sous le plafond, « Ma semaine » a 18216 caracteres et
+la liste sortante a 22949, mais avec une marge qui se serait refermee a mesure que le
+portefeuille grossit.

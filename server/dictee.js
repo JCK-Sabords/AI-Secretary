@@ -12,10 +12,22 @@ const DELAI_MS = 120000;
 const TAILLE_MAX_SORTIE = 2 * 1024 * 1024;
 
 // Taille maximale du prompt (voir construirePrompt) : au-dela, des projets sont
-// retires du portefeuille envoye. Le prompt part comme argument unique de la ligne
-// de commande lancant claude (voir lancerClaudeReel), et Windows borne la longueur
-// d'une ligne de commande ; le portefeuille est trivial aujourd'hui mais grossira.
-const LIMITE_PROMPT = 24000;
+// retires du portefeuille envoye.
+//
+// Cette limite valait 24000 caracteres tant que le prompt partait en argument de
+// la ligne de commande : Windows plafonne une ligne de commande a 32767 caracteres
+// et refusait de lancer le processus au-dela, avec ENAMETOOLONG. Le prompt passe
+// desormais par l'entree standard (voir lancerClaudeReel), ou ce plafond n'existe
+// pas. Mesure faite le jour du correctif, le portefeuille produisait un prompt de
+// 35154 caracteres : la dictee etait cassee en permanence, et la reduction
+// ci-dessous ne savait pas y remedier.
+//
+// Il reste une limite, mais elle ne protege plus le systeme d'exploitation : elle
+// borne ce que le modele doit lire. 200000 caracteres valent environ 50000 jetons,
+// soit une marge large devant la fenetre de contexte, assez haute pour ne jamais
+// se declencher sur un portefeuille personnel et assez basse pour qu'un dossier de
+// projets devenu aberrant ne parte pas en entier.
+const LIMITE_PROMPT = 200000;
 
 function aujourdhui() {
   const d = new Date();
@@ -141,9 +153,22 @@ function construirePrompt(projects, people, texte, today, proprietaire) {
   };
 
   let prompt = assembler();
-  while (prompt.length > LIMITE_PROMPT) {
-    const idx = projetsAllumes.findIndex((p) => (p.taches || []).length === 0);
-    if (idx === -1) break;
+  // Les projets sans tache ouverte partent les premiers : ce sont les moins utiles
+  // a une dictee, qui porte sur des taches a mener. Mais s'arreter la ne reduisait
+  // rien des que tous les projets portaient une tache, ce qui est le cas courant :
+  // la boucle sortait en laissant le prompt au-dessus de la limite, sans que rien
+  // ne le signale. A defaut de projet vide, le plus volumineux part donc, car c'est
+  // celui qui rapproche le plus vite de la limite.
+  while (prompt.length > LIMITE_PROMPT && projetsAllumes.length > 0) {
+    let idx = projetsAllumes.findIndex((p) => (p.taches || []).length === 0);
+    if (idx === -1) {
+      idx = 0;
+      let max = -1;
+      projetsAllumes.forEach((p, i) => {
+        const taille = JSON.stringify(p).length;
+        if (taille > max) { max = taille; idx = i; }
+      });
+    }
     projetsAllumes.splice(idx, 1);
     tronque = true;
     prompt = assembler();
@@ -315,18 +340,27 @@ function resoudreBinaireClaude(env, plateforme) {
 // aucun moyen de recevoir (execFile ne fournit pas de TTY interactif). C'est un
 // effet du meme flag, pas une seconde option a ajouter : sans outil, il n'existe
 // tout simplement plus rien a approuver.
-function argumentsClaude(prompt) {
-  // L'ordre compte. `--tools` est un parametre variadique de la ligne de commande :
-  // place juste apres lui, le prompt est avale comme s'il etait un nom d'outil, et
-  // le binaire echoue avec "Input must be provided either through stdin or as a
-  // prompt argument". Le prompt doit donc passer AVANT tout drapeau variadique.
-  return ['-p', prompt, '--tools', ''];
+function argumentsClaude() {
+  // Le prompt ne figure plus ici : il est ecrit sur l'entree standard du processus
+  // (voir lancerClaudeReel). Le binaire accepte les deux formes, son propre message
+  // d'erreur le dit : "Input must be provided either through stdin or as a prompt
+  // argument". La ligne de commande reste donc de taille fixe, quelle que soit la
+  // taille du portefeuille.
+  //
+  // Du meme coup, la question de l'ordre des drapeaux disparait : `--tools` est
+  // variadique, et un prompt place apres lui etait avale comme un nom d'outil.
+  return ['-p', '--tools', ''];
 }
 
+// Le prompt est ecrit sur l'entree standard du processus, jamais passe en argument.
+// Windows plafonne une ligne de commande a 32767 caracteres et refuse de lancer le
+// processus au-dela : le prompt de dictee depassait ce plafond des que le
+// portefeuille a grossi, et l'appel echouait avec ENAMETOOLONG avant meme d'avoir
+// commence. L'entree standard ne connait pas cette borne.
 function lancerClaudeReel(prompt) {
   const binaire = resoudreBinaireClaude(process.env, process.platform);
   return new Promise((resolve, reject) => {
-    execFile(binaire, argumentsClaude(prompt), {
+    const enfant = execFile(binaire, argumentsClaude(), {
       timeout: DELAI_MS,
       maxBuffer: TAILLE_MAX_SORTIE,
       windowsHide: true
@@ -337,6 +371,12 @@ function lancerClaudeReel(prompt) {
         reject(e);
       }
     });
+    // Le processus peut mourir avant d'avoir tout lu (binaire introuvable, delai
+    // depasse). Sans ce garde-fou, le EPIPE qui en resulte remonterait en
+    // exception non capturee et abattrait le serveur, au lieu d'etre traite comme
+    // l'echec d'appel qu'il est : le rappel ci-dessus en rend deja compte.
+    enfant.stdin.on('error', () => {});
+    enfant.stdin.end(prompt);
   });
 }
 

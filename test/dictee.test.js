@@ -130,14 +130,42 @@ test('construirePrompt reste sous la limite de taille sur un portefeuille volumi
         derniere_relance: '', prochaine_relance: '', maj_le: '2026-09-01', note_blocage: ''}]};
   }
   const projets = [];
-  for (let i = 0; i < 500; i++) projets.push(projetFerme(i));
+  for (let i = 0; i < 9000; i++) projets.push(projetFerme(i));
   for (let i = 0; i < 3; i++) projets.push(projetActif(i));
   const texte = 'ajoute une tache sur Projet actif 1 : verifier le dossier';
   const p = dictee.construirePrompt(projets, personnesExemple(), texte, '2026-09-07', 'Alex');
-  assert.ok(p.length <= 24000, 'le prompt doit rester sous la limite (' + p.length + ' caracteres)');
+  assert.ok(p.length <= 200000, 'le prompt doit rester sous la limite (' + p.length + ' caracteres)');
   assert.ok(p.includes(texte), 'le prompt doit toujours contenir la demande de l utilisateur');
   assert.match(p, /tronque/, 'le prompt doit signaler explicitement la troncature');
   assert.ok(p.includes('actif1'), 'un projet avec tache ouverte doit rester dans la liste');
+});
+
+// Defaut constate en conditions reelles le 2026-10-05 : la reduction ne retirait
+// que les projets sans tache ouverte. Des que tous en portaient une, elle sortait
+// de sa boucle en laissant le prompt au-dessus de la limite, sans rien signaler.
+// Le portefeuille reel produisait alors un prompt de 35154 caracteres la ou
+// Windows plafonne une ligne de commande a 32767 : la dictee echouait en
+// permanence avec ENAMETOOLONG. Le prompt passe desormais par stdin, mais la
+// reduction doit malgre tout savoir aboutir.
+test('construirePrompt reduit meme quand tous les projets portent une tache', () => {
+  function gros(i) {
+    return {id: 'gros' + i, prefixe: 'G' + i, titre: 'Projet ' + i, domaine: 'side',
+      statut: 'actif', echeance: '', prochaine_action: 'faire', jira: '', dernier_n: 1,
+      contexte: '',
+      taches: [{n: 1, titre: 'tache ' + 'tres longue '.repeat(400), responsable: 'moi',
+        echeance: '', nature_echeance: 'souhaitee', prio: 'P3', effort: 'M', bloque_par: '',
+        derniere_relance: '', prochaine_relance: '', maj_le: '2026-09-01', note_blocage: ''}]};
+  }
+  const projets = [];
+  for (let i = 0; i < 60; i++) projets.push(gros(i));
+  // Aucun projet vide : l'ancienne boucle n'avait rien a retirer et abandonnait.
+  assert.strictEqual(projets.filter((x) => x.taches.length === 0).length, 0);
+  const texte = 'ajoute une tache';
+  const p = dictee.construirePrompt(projets, personnesExemple(), texte, '2026-09-07', 'Alex');
+  assert.ok(p.length <= 200000,
+    'la reduction doit aboutir meme sans projet vide (' + p.length + ' caracteres)');
+  assert.match(p, /tronque/, 'une troncature doit toujours etre signalee au modele');
+  assert.ok(p.includes(texte), 'la demande de l utilisateur ne doit jamais etre sacrifiee');
 });
 
 /* ============================ extraireJson ============================ */
@@ -265,23 +293,35 @@ test('argumentsClaude interdit explicitement l usage de tout outil (--tools "")'
   assert.strictEqual(args[i + 1], '', '--tools doit desactiver tous les outils (valeur vide)');
 });
 
-test('argumentsClaude conserve -p et transmet le prompt tel quel', () => {
-  const args = dictee.argumentsClaude('un prompt avec des "guillemets"');
+test('argumentsClaude conserve -p', () => {
+  const args = dictee.argumentsClaude();
   assert.ok(args.includes('-p'));
-  assert.ok(args.includes('un prompt avec des "guillemets"'));
 });
 
-/* Regression (constatee en conditions reelles le 2026-09-15) : la forme
-   ['-p', '--tools', '', prompt] echouait avec "Input must be provided either
-   through stdin or as a prompt argument". `--tools` est variadique : il avalait le
-   prompt comme un nom d'outil. Le prompt doit preceder tout drapeau variadique. */
-test('argumentsClaude place le prompt avant --tools, qui est variadique', () => {
+/* Regression (constatee en conditions reelles le 2026-10-05) : le prompt partait
+   en argument de la ligne de commande, que Windows plafonne a 32767 caracteres. Le
+   portefeuille reel en produisait 35154, et le processus etait refuse avant meme
+   d'avoir demarre, avec ENAMETOOLONG. Il passe desormais par stdin, et la ligne de
+   commande garde une taille fixe quelle que soit la taille du portefeuille.
+
+   Du meme coup la question de l'ordre des drapeaux disparait : `--tools` etant
+   variadique, un prompt place apres lui etait avale comme un nom d'outil. */
+test('argumentsClaude ne transporte plus le prompt', () => {
   const prompt = 'ajoute une tache sur Estimmo';
   const args = dictee.argumentsClaude(prompt);
-  assert.ok(args.indexOf(prompt) < args.indexOf('--tools'),
-    'le prompt doit preceder --tools, sinon il est avale comme nom d outil');
-  assert.strictEqual(args[args.indexOf('-p') + 1], prompt,
-    'le prompt doit suivre immediatement -p');
+  assert.ok(args.indexOf(prompt) === -1,
+    'le prompt ne doit plus figurer dans la ligne de commande');
+  assert.deepStrictEqual(args, ['-p', '--tools', '']);
+});
+
+// La taille de la ligne de commande ne doit plus dependre du portefeuille : c'est
+// toute la raison du passage par stdin.
+test('la ligne de commande garde une taille fixe quel que soit le prompt', () => {
+  const court = dictee.argumentsClaude('a').join(' ').length;
+  const enorme = dictee.argumentsClaude('x'.repeat(500000)).join(' ').length;
+  assert.strictEqual(court, enorme);
+  assert.ok(enorme < 32767,
+    'la ligne de commande doit rester tres en deca du plafond Windows');
 });
 
 /* ============================ resoudreBinaireClaude ============================ */
